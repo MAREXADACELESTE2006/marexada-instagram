@@ -36,7 +36,7 @@ LUGAR = "Balaídos"
 
 
 def _get(url):
-    req = urllib.request.Request(url, headers={"accept": "application/json", "user-agent": "Mozilla/5.0 (Marexada Celeste bot)"})
+    req = urllib.request.Request(url, headers={"accept": "application/json", "user-agent": "Mozilla/5.0 (compatible; MarexadaCeleste/1.0)"})
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.loads(r.read().decode("utf-8"))
 
@@ -119,7 +119,7 @@ def leer(fuente):
     if fuente == "directo":
         return leer_directo()
     if re.match(r"https?://", fuente):
-        req = urllib.request.Request(fuente, headers={"accept": "application/json", "user-agent": "Mozilla/5.0 (Marexada Celeste bot)"})
+        req = urllib.request.Request(fuente, headers={"accept": "application/json", "user-agent": "Mozilla/5.0 (compatible; MarexadaCeleste/1.0)"})
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.loads(r.read().decode("utf-8"))
     return json.load(open(fuente, encoding="utf-8"))

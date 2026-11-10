@@ -49,7 +49,7 @@ class ErrorLector(Exception):
 # ---------------------------------------------------------------- lectura de la fuente
 def leer(fuente):
     if re.match(r"https?://", fuente):
-        req = urllib.request.Request(fuente, headers={"User-Agent": "Mozilla/5.0 (Marexada Celeste bot)"})
+        req = urllib.request.Request(fuente, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Accept-Language": "es-ES,es;q=0.9"})
         with urllib.request.urlopen(req, timeout=30) as r:
             return r.read().decode("utf-8", errors="replace")
     with open(fuente, encoding="utf-8") as f:

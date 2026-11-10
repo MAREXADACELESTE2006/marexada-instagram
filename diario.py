@@ -1,4 +1,4 @@
-"""Marexada Celeste · programa diario de historias de Instagram (v13) — MODO REVISIÓN.
+"""Marexada Celeste · programa diario de historias de Instagram (v20) — MODO REVISIÓN.
 
 Cada día (lo ejecuta GitHub Actions, ver INSTALAR.md) este programa:
   1. lee las fuentes: noticias de rccelta.es (convocatorias y crónicas), calendario y resultados del Celta/Fortuna (ESPN/TheSportsDB), clasificaciones y AS Celtas Fem (besoccer);
@@ -68,6 +68,10 @@ def correr(script, args, etiqueta, avisos):
         ultima = ((r.stderr or r.stdout).strip().splitlines() or ["sin detalle"])[-1]
         avisos.append(f"{etiqueta}: {ultima}")
     return r.returncode == 0
+
+
+def hora_madrid():
+    return datetime.datetime.now(MADRID).hour
 
 
 def nombre_lado(d, lado):
@@ -147,6 +151,21 @@ def plan(hoy, datos, avisos):
         if d:
             add(f"clasificacion-{tabla[1]}-{d['jornada']}", tabla[0], "tarde", "19:00",
                 f"Así está a clasificación de {tabla[2]} tras a {d['jornada'].lower()}. 💙 {etiquetas(tabla[1])}")
+    # Parte médico: sale una historia cuando el parte cambia (entra o sale alguien, o cambia un diagnóstico).
+    for nombre in ("celta", "fortuna"):
+        for fichero in sorted(f for f in datos if re.fullmatch(rf"partemedico_{nombre}(_\d+)?\.json", f)):
+            pm = datos[fichero]
+            if not pm or not pm.get("firma"):
+                continue
+            pag = pm.get("pagina") or "1/1"
+            quien = "do Celta Fortuna" if nombre == "fortuna" else "do Celta"
+            n = pm.get("n_total", len(pm.get("lesionados", [])))
+            if n:
+                nombres = ", ".join(x["nombre"] for x in pm["lesionados"])
+                txt = f"Parte médico {quien}: {n} {'xogador' if n == 1 else 'xogadores'} en baixa. {nombres}. Moito ánimo e pronta recuperación! 💙 {etiquetas(nombre)}"
+            else:
+                txt = f"Parte médico {quien}: sen baixas por lesión! 💙 {etiquetas(nombre)}"
+            add(f"partemedico-{nombre}-{pm['firma']}-{pag.split('/')[0]}", fichero, "tarde", "cando o publique o club (ou a tarde)", txt)
     return out
 
 
@@ -205,6 +224,7 @@ def main():
             ("resultados.py", ["--desde", fx("espn_resultados_EJEMPLO.json"), "--ahora", f"{hoy.isoformat()}T06:00:00", "--salida", d_datos], "Resultados Celta/Fortuna"),
             ("besoccer.py", ["--clasif", fx("besoccer_clasificacion_RECONSTRUIDO.html"), "--partidos", fx("besoccer_partidos_RECONSTRUIDO.html"),
                              "--hoy", hoy.isoformat(), "--salida", d_datos], "AS Celtas Fem (besoccer)"),
+            ("partemedico.py", ["--desde", fx("partemedico_RECONSTRUIDO"), "--salida", d_datos], "Parte médico (rccelta.es)"),
         ]
     else:
         ahora = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
@@ -214,6 +234,7 @@ def main():
             ("noticias.py", ["--salida", d_datos], "Noticias rccelta.es"),
             ("resultados.py", ["--ahora", ahora, "--salida", d_datos], "Resultados Celta/Fortuna"),
             ("futbolme.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "AS Celtas Fem (futbolme)"),
+            ("partemedico.py", ["--salida", d_datos], "Parte médico (rccelta.es)"),
         ]
     ok = [correr(s, args, etq, avisos) for s, args, etq in fuentes]
 
@@ -250,9 +271,21 @@ def main():
     resumen = "\n".join(L) + "\n"
     open(os.path.join(carpeta, "resumen.md"), "w", encoding="utf-8").write(resumen)
 
-    if not a.sin_telegram and not a.offline:
-        telegram(historias, resumen, avisos)
-    if not a.sin_estado and not a.offline:
+    # Telegram: avisa cuando hay historias nuevas o algún aviso (error). Además, el resumen del día (con el contenido propio que
+    # toca hoy) llega UNA vez al día, en la primera ejecución de la mañana (o siempre que lances el trabajo a mano).
+    clave_resumen = f"resumen-{hoy.isoformat()}"
+    manual = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
+    resumen_dia = not a.offline and (manual or (5 <= hora_madrid() < 13 and clave_resumen not in estado))
+    enviado = False
+    configurado = bool(os.environ.get("TELEGRAM_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID"))
+    quiere_envio = bool(historias or avisos or resumen_dia)
+    if not a.sin_telegram and not a.offline and quiere_envio:
+        enviado = telegram(historias, resumen, avisos)
+    # Si Telegram está configurado y el envío falla, no se anota nada: las historias y el resumen se reintentan en la siguiente ejecución.
+    fallo_envio = configurado and quiere_envio and not enviado and not a.sin_telegram and not a.offline
+    if not a.sin_estado and not a.offline and not fallo_envio:
+        if resumen_dia and not manual:
+            estado[clave_resumen] = hoy.isoformat()
         for h in historias:
             estado[h["clave"]] = hoy.isoformat()
         os.makedirs(os.path.dirname(ESTADO), exist_ok=True)

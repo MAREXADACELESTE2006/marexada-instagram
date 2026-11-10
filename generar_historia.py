@@ -339,6 +339,74 @@ def clasificacion(datos):
 
 
 
+# ---------------------------------------------------------------- parte médico
+def font_m(size):
+    return ImageFont.truetype(os.path.join(ASSETS, "fuentes", "Poppins-Medium.ttf"), int(size))
+
+
+def _lineas(d, texto, f, maxw, maximo=2):
+    """Parte un texto en como mucho `maximo` líneas; si sobra, la última acaba en «…»."""
+    palabras, lineas, actual = texto.split(), [], ""
+    for p in palabras:
+        prueba = (actual + " " + p).strip()
+        if d.textlength(prueba, font=f) <= maxw or not actual:
+            actual = prueba
+        else:
+            lineas.append(actual)
+            actual = p
+    if actual:
+        lineas.append(actual)
+    if len(lineas) > maximo:
+        lineas = lineas[:maximo]
+        while d.textlength(lineas[-1] + "…", font=f) > maxw and " " in lineas[-1]:
+            lineas[-1] = lineas[-1].rsplit(" ", 1)[0]
+        lineas[-1] += "…"
+    return lineas
+
+
+def _fecha_corta(iso):
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})", iso or "")
+    return f"{m.group(3)}/{m.group(2)}/{m.group(1)[2:]}" if m else (iso or "")
+
+
+def partemedico(datos):
+    img = fondo(); d = ImageDraw.Draw(img)
+    center(d, 110, datos.get("tag", ""), font(44), fill=AZUL)
+    center(d, 165, "PARTE MÉDICO", fit(d, "PARTE MÉDICO", 86, W - 100))
+    sub = " · ".join(x for x in (("Actualizado: " + datos["actualizado"]) if datos.get("actualizado") else None, datos.get("pagina")) if x)
+    if sub:
+        center(d, 285, sub, fit(d, sub, 34, W - 80), fill=(200, 218, 240))
+    les = datos.get("lesionados", [])
+    if not les:
+        center(d, 760, "Sen baixas", font(84))
+        center(d, 880, "por lesión", font(84))
+        center(d, 1010, "no parte médico", font(40), fill=AZUL)
+    y0, ph = 372, 168
+    for i, x in enumerate(les):
+        y = y0 + i * ph
+        cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        ImageDraw.Draw(cap).rounded_rectangle([40, y, W - 40, y + ph - 10], 14, fill=(255, 255, 255, 30))
+        img.paste(cap, (0, 0), cap)
+        d = ImageDraw.Draw(img)
+        cx, cy = 100, y + (ph - 10) // 2          # cruz médica en un círculo blanco
+        d.ellipse([cx - 36, cy - 36, cx + 36, cy + 36], fill=WHITE)
+        d.rectangle([cx - 8, cy - 24, cx + 8, cy + 24], fill=(208, 40, 52))
+        d.rectangle([cx - 24, cy - 8, cx + 24, cy + 8], fill=(208, 40, 52))
+        d.text((170, y + 8), x["nombre"], font=fit(d, x["nombre"], 38, 600), fill=WHITE)
+        fd = font_m(27)
+        yy = y + 58
+        for l in _lineas(d, x.get("diagnostico", ""), fd, 640):
+            d.text((170, yy), l, font=fd, fill=(214, 228, 246))
+            yy += 31
+        if x.get("observaciones") and yy + 28 < y + ph - 10:
+            d.text((170, yy + 2), x["observaciones"], font=fit(d, x["observaciones"], 22, 640, 18), fill=AZUL)
+        center(d, y + 32, "DENDE", font(22), fill=AZUL, x=915)
+        center(d, y + 62, _fecha_corta(x.get("fecha")), font(30), fill=WHITE, x=915)
+    pie(img, d)
+    return img
+
+
+
 # ---------------------------------------------------------------- previa en la sede
 def _jarra():
     """Jarra de cerveza con asa a la derecha (cristal grueso, cerveza ámbar y espuma), dibujada al doble de tamaño."""
@@ -443,4 +511,4 @@ def previa(datos):
     return img
 
 
-RENDER = {"previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}
+RENDER = {"partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}

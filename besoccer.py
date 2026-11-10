@@ -244,7 +244,15 @@ def main():
     hoy = datetime.date.fromisoformat(a.hoy) if a.hoy else datetime.date.today()
     os.makedirs(a.salida, exist_ok=True)
 
-    filas = leer_clasificacion(leer(a.clasif))
+    html_clasif = leer(a.clasif)
+    try:
+        filas = leer_clasificacion(html_clasif)
+    except ErrorLector:
+        # guarda lo recibido (en salida/FECHA/datos/) para poder ver qué ha cambiado en la página
+        with open(os.path.join(a.salida, "besoccer_clasif_DEBUG.html"), "w", encoding="utf-8") as f:
+            f.write(html_clasif)
+        print(f"aviso: guardada besoccer_clasif_DEBUG.html ({len(html_clasif)} caracteres)", file=sys.stderr)
+        raise
     nombres = {f["slug"]: f["nombre"] for f in filas}
     partidos = leer_partidos(leer(a.partidos), hoy, nombres)
 

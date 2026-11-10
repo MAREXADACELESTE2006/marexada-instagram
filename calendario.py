@@ -72,15 +72,36 @@ def partidos_celta(j):
     return out
 
 
-def partidos_fortuna(j):
-    """ESPN schedule del Celta Fortuna -> lista de partidos en el formato de la web."""
+ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer/{}/teams/{}"
+CELTA_ESPN, FORTUNA_ESPN = "85", "131858"
+
+
+def _k_de_evento(ev, k_defecto):
+    """Si ESPN dice a qué competición pertenece el evento, se respeta; si no, la de la liga consultada."""
+    txt = json.dumps({x: ev.get(x) for x in ("name", "shortName", "league", "season", "seasonType") if x in ev}, ensure_ascii=False)
+    if re.search(r"europa", txt, re.I):
+        return "euro"
+    if re.search(r"copa", txt, re.I):
+        return "copa"
+    if re.search(r"hypermotion|segunda|laliga 2|la liga 2", txt, re.I):
+        return "hm"
+    return k_defecto
+
+
+def partidos_espn(j, k, k_estricto=True):
+    """Eventos NO terminados de una respuesta de ESPN (schedule o team.nextEvent)."""
+    evs = (j or {}).get("events")
+    if not evs:
+        ne = ((j or {}).get("team") or {}).get("nextEvent")
+        evs = ne if isinstance(ne, list) else ([ne] if ne else [])
+        k_estricto = False
     out = []
-    for ev in (j or {}).get("events") or []:
+    for ev in evs:
         comp = (ev.get("competitions") or [None])[0]
-        if not comp:
+        if not comp or not ev.get("date"):
             continue
-        st = (comp.get("status") or {}).get("type") or {}
-        if st.get("completed"):
+        st = (comp.get("status") or ev.get("status") or {}).get("type") or {}
+        if st.get("completed") or re.search(r"FULL_TIME|FINAL", st.get("name", "")):
             continue
         h = a = None
         for t in comp.get("competitors") or []:
@@ -88,31 +109,58 @@ def partidos_fortuna(j):
                 h = t
             else:
                 a = t
-        if not h or not a or not ev.get("date"):
+        if not h or not a:
             continue
         nm = lambda t: (t.get("team") or {}).get("displayName") or (t.get("team") or {}).get("name") or ""
-        out.append({"date": ev["date"], "home": nm(h), "away": nm(a), "k": "hm",
+        out.append({"date": ev["date"], "home": nm(h), "away": nm(a), "k": k if k_estricto else _k_de_evento(ev, k),
                     "celtaHome": bool(re.search(r"celta", nm(h), re.I)), "tbc": False})
     return out
 
 
+def partidos_fortuna(j):
+    return partidos_espn(j, "hm")
+
+
 def leer_directo():
-    partidos, avisos = [], []
-    for nombre_, url, fn in (("Celta (TheSportsDB)", SDB, partidos_celta), ("Celta Fortuna (ESPN)", ESPN_FORTUNA, partidos_fortuna)):
+    """Próximos partidos. ESPN primero (es lo que ya funciona en resultados.py); TheSportsDB de apoyo."""
+    partidos, diag = [], []
+
+    def probar(etiqueta, liga, id_, k, sufijos):
+        for suf in sufijos:
+            url = ESPN_BASE.format(liga, id_) + suf
+            try:
+                crudo = _get(url)
+                lista = partidos_espn(crudo, k)
+                n = len(crudo.get("events") or [])
+                if lista:
+                    return lista
+                diag.append(f"{etiqueta} {suf or 'team'}: {n} eventos, 0 próximos")
+            except Exception as e:
+                diag.append(f"{etiqueta} {suf or 'team'}: {type(e).__name__}: {e}")
+        return []
+
+    suf = ("/schedule?fixture=true", "/schedule", "")
+    for liga, k in (("esp.1", "liga"), ("uefa.europa", "euro"), ("esp.copa_del_rey", "copa")):
+        partidos += probar(f"Celta/{liga}", liga, CELTA_ESPN, k, suf)
+    partidos += probar("Fortuna/esp.2", "esp.2", FORTUNA_ESPN, "hm", suf)
+
+    if not any(p["k"] != "hm" for p in partidos):          # apoyo: TheSportsDB para el Celta
         try:
-            crudo = _get(url)
-            lista = fn(crudo)
-            partidos += lista
-            if not lista:
-                n = len((crudo or {}).get("events") or [])
-                avisos.append(f"{nombre_}: respondió pero sin partidos utilizables ({n} eventos en bruto)")
-        except Exception as e:  # una fuente caída no debe tumbar la otra
-            avisos.append(f"{nombre_}: {type(e).__name__}: {e}")
-    for av in avisos:
-        print("aviso:", av, file=sys.stderr)
-    if not partidos:
-        sys.exit("ERROR: sin partidos. " + " | ".join(avisos))
-    return {"partidos": partidos}
+            partidos += partidos_celta(_get(SDB))
+        except Exception as e:
+            diag.append(f"Celta/TheSportsDB: {type(e).__name__}: {e}")
+
+    vistos, unicos = set(), []                              # sin duplicados
+    for p in partidos:
+        c = (p["date"][:16], p["home"], p["away"])
+        if c not in vistos:
+            vistos.add(c)
+            unicos.append(p)
+    for d in diag:
+        print("aviso:", d, file=sys.stderr)
+    if not unicos:
+        sys.exit("ERROR: sin partidos. " + " | ".join(diag[:6]))
+    return {"partidos": unicos}
 
 
 def leer(fuente):

@@ -3,7 +3,11 @@ name: Historias diarias (revisión)
 on:
   schedule:
     - cron: "0 6 * * *"        # 06:00 UTC = 07:00 (invierno) / 08:00 (verano) en Galicia. GitHub puede retrasarlo unos minutos
-    - cron: "30 22 * * *"      # 22:30 UTC = 23:30 (invierno) / 00:30 (verano): recoge el resultado de los partidos de la tarde-noche
+    - cron: "0 12 * * *"       # 13:00 / 14:00
+    - cron: "30 16 * * *"      # 17:30 / 18:30
+    - cron: "0 19 * * *"       # 20:00 / 21:00: resultados de los partidos de las 17:00 y 18:00
+    - cron: "0 21 * * *"       # 22:00 / 23:00: resultados de los partidos de las 20:00
+    - cron: "30 22 * * *"      # 23:30 / 00:30: resultados de los partidos de la noche
   workflow_dispatch:           # botón "Run workflow" para probarlo a mano
 
 permissions:

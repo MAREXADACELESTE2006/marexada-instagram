@@ -213,7 +213,7 @@ def main():
             ("clasificaciones.py", ["--salida", d_datos], "Clasificaciones"),
             ("noticias.py", ["--salida", d_datos], "Noticias rccelta.es"),
             ("resultados.py", ["--ahora", ahora, "--salida", d_datos], "Resultados Celta/Fortuna"),
-            ("besoccer.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "AS Celtas Fem (besoccer)"),
+            ("futbolme.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "AS Celtas Fem (futbolme)"),
         ]
     ok = [correr(s, args, etq, avisos) for s, args, etq in fuentes]
 

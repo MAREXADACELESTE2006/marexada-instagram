@@ -100,11 +100,18 @@ def leer_directo():
     partidos, avisos = [], []
     for nombre_, url, fn in (("Celta (TheSportsDB)", SDB, partidos_celta), ("Celta Fortuna (ESPN)", ESPN_FORTUNA, partidos_fortuna)):
         try:
-            partidos += fn(_get(url))
+            crudo = _get(url)
+            lista = fn(crudo)
+            partidos += lista
+            if not lista:
+                n = len((crudo or {}).get("events") or [])
+                avisos.append(f"{nombre_}: respondió pero sin partidos utilizables ({n} eventos en bruto)")
         except Exception as e:  # una fuente caída no debe tumbar la otra
-            avisos.append(f"{nombre_}: {e}")
+            avisos.append(f"{nombre_}: {type(e).__name__}: {e}")
     for av in avisos:
         print("aviso:", av, file=sys.stderr)
+    if not partidos:
+        sys.exit("ERROR: sin partidos. " + " | ".join(avisos))
     return {"partidos": partidos}
 
 

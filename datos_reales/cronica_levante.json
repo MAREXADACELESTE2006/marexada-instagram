@@ -1,0 +1,14 @@
+{
+ "tipo": "resultado",
+ "competicion": "liga",
+ "local": "celta-vigo",
+ "visitante": "levante-ud",
+ "jornada": "Xornada 12",
+ "lugar": "Balaídos",
+ "goles_local": 0,
+ "goles_visitante": 0,
+ "goleadores_local": [],
+ "goleadores_visitante": [],
+ "logo": "laliga",
+ "fecha_hora": "Dom 08/11"
+}

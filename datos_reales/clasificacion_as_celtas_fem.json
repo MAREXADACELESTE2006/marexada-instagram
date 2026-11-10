@@ -1,0 +1,122 @@
+{
+ "tipo": "clasificacion",
+ "competicion": "liga",
+ "tag": "AS CELTAS FEM",
+ "subtitulo": "Segunda Federación Femenina · Grupo 1",
+ "jornada": "Xornada 8",
+ "destacado": "AS Celtas",
+ "filas": [
+  {
+   "pos": 1,
+   "nombre": "Deportivo Abanca B",
+   "escudo": "deportivo-la-coruna",
+   "pts": 21,
+   "pj": 8,
+   "dg": 21
+  },
+  {
+   "pos": 2,
+   "nombre": "Real Oviedo",
+   "escudo": "real-oviedo",
+   "pts": 18,
+   "pj": 8,
+   "dg": 15
+  },
+  {
+   "pos": 3,
+   "nombre": "Real Sporting",
+   "escudo": "sporting-gijon",
+   "pts": 15,
+   "pj": 8,
+   "dg": 5
+  },
+  {
+   "pos": 4,
+   "nombre": "Eibar B",
+   "escudo": "sd-eibar",
+   "pts": 15,
+   "pj": 8,
+   "dg": 5
+  },
+  {
+   "pos": 5,
+   "nombre": "Real Avilés",
+   "escudo": null,
+   "pts": 13,
+   "pj": 8,
+   "dg": -1
+  },
+  {
+   "pos": 6,
+   "nombre": "AS Celtas",
+   "escudo": "celta-vigo",
+   "pts": 11,
+   "pj": 8,
+   "dg": -1
+  },
+  {
+   "pos": 7,
+   "nombre": "Burgos CF",
+   "escudo": "burgos-cf",
+   "pts": 9,
+   "pj": 8,
+   "dg": 8
+  },
+  {
+   "pos": 8,
+   "nombre": "Racing",
+   "escudo": "racing-santander",
+   "pts": 9,
+   "pj": 8,
+   "dg": -2
+  },
+  {
+   "pos": 9,
+   "nombre": "CD Arratia",
+   "escudo": null,
+   "pts": 9,
+   "pj": 8,
+   "dg": -6
+  },
+  {
+   "pos": 10,
+   "nombre": "Osasuna B",
+   "escudo": "osasuna",
+   "pts": 9,
+   "pj": 8,
+   "dg": -12
+  },
+  {
+   "pos": 11,
+   "nombre": "Club Bizkerre",
+   "escudo": null,
+   "pts": 8,
+   "pj": 8,
+   "dg": -6
+  },
+  {
+   "pos": 12,
+   "nombre": "Victoria CF",
+   "escudo": null,
+   "pts": 7,
+   "pj": 8,
+   "dg": -7
+  },
+  {
+   "pos": 13,
+   "nombre": "Rayo Vallecano",
+   "escudo": "rayo-vallecano",
+   "pts": 7,
+   "pj": 8,
+   "dg": -16
+  },
+  {
+   "pos": 14,
+   "nombre": "Madrid CFF B",
+   "escudo": null,
+   "pts": 5,
+   "pj": 8,
+   "dg": -3
+  }
+ ]
+}

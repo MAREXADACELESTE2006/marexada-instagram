@@ -1,0 +1,15 @@
+{
+ "tipo": "resultado",
+ "competicion": "liga",
+ "tag": "AS CELTAS FEM",
+ "local": "celta-vigo",
+ "visitante": "osasuna",
+ "local_nombre": "AS Celtas",
+ "visitante_nombre": "Osasuna B",
+ "jornada": "Xornada 2",
+ "fecha_hora": "Dom 13/09",
+ "goles_local": 5,
+ "goles_visitante": 0,
+ "goleadores_local": [],
+ "goleadores_visitante": []
+}

@@ -1,0 +1,115 @@
+{
+ "tipo": "convocatoria",
+ "competicion": "liga",
+ "local": "sporting-gijon",
+ "visitante": "celta-vigo",
+ "jornada": "Hypermotion · Xornada 8",
+ "lugar": "El Molinón",
+ "fecha_hora": "Dom 04/10 · 16:15",
+ "convocados": [
+  {
+   "nombre": "Coke Carrillo",
+   "dorsal": 1
+  },
+  {
+   "nombre": "Caio Barone",
+   "dorsal": 13
+  },
+  {
+   "nombre": "Marcos González",
+   "dorsal": 25
+  },
+  {
+   "nombre": "Pablo Gavián",
+   "dorsal": 2
+  },
+  {
+   "nombre": "Quique Ribes",
+   "dorsal": 3
+  },
+  {
+   "nombre": "Seyni Ndiaye",
+   "dorsal": 4
+  },
+  {
+   "nombre": "Pablo Meixús",
+   "dorsal": 6
+  },
+  {
+   "nombre": "Álvaro Marín",
+   "dorsal": 9
+  },
+  {
+   "nombre": "Óscar Marcos",
+   "dorsal": 10
+  },
+  {
+   "nombre": "Ángel Arcos",
+   "dorsal": 11
+  },
+  {
+   "nombre": "Jan Oliveras",
+   "dorsal": 14
+  },
+  {
+   "nombre": "Aldrine Kibet",
+   "dorsal": 15
+  },
+  {
+   "nombre": "Adrià Capdevila",
+   "dorsal": 16
+  },
+  {
+   "nombre": "Joel López",
+   "dorsal": 18
+  },
+  {
+   "nombre": "Ángel Davila",
+   "dorsal": 19
+  },
+  {
+   "nombre": "Anxo Rodríguez",
+   "dorsal": 20
+  },
+  {
+   "nombre": "Alexis Olmedo",
+   "dorsal": 21
+  },
+  {
+   "nombre": "Germain Milla",
+   "dorsal": 23
+  },
+  {
+   "nombre": "Jorge Pérez",
+   "dorsal": 26
+  },
+  {
+   "nombre": "Noah Rodríguez",
+   "dorsal": 27
+  },
+  {
+   "nombre": "Vlad Silva",
+   "dorsal": 28
+  },
+  {
+   "nombre": "David Sueiro",
+   "dorsal": 33
+  }
+ ],
+ "bajas": [
+  {
+   "nombre": "Bernard Somuah",
+   "dorsal": 7,
+   "motivo": "lesion"
+  },
+  {
+   "nombre": "Andrés Antañón",
+   "dorsal": 8,
+   "motivo": "lesion"
+  }
+ ],
+ "_rival_texto": "Sporting de Gijón",
+ "logo": "hypermotion",
+ "tag": "CELTA FORTUNA",
+ "visitante_nombre": "CELTA FORTUNA"
+}

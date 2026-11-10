@@ -1,0 +1,128 @@
+{
+ "tipo": "convocatoria",
+ "competicion": "liga",
+ "local": "celta-vigo",
+ "visitante": "levante-ud",
+ "jornada": "Xornada 12",
+ "lugar": "Balaídos",
+ "fecha_hora": "Dom 08/11 · 18:30",
+ "convocados": [
+  {
+   "nombre": "Altay Bayındır",
+   "dorsal": 1
+  },
+  {
+   "nombre": "Andrei Radu",
+   "dorsal": 13
+  },
+  {
+   "nombre": "Iván Villar",
+   "dorsal": 25
+  },
+  {
+   "nombre": "Marcos Alonso",
+   "dorsal": 3
+  },
+  {
+   "nombre": "Abdoulaye Faye",
+   "dorsal": 4
+  },
+  {
+   "nombre": "Sergio Carreira",
+   "dorsal": 5
+  },
+  {
+   "nombre": "Ilaix Moriba",
+   "dorsal": 6
+  },
+  {
+   "nombre": "Ferran Jutglà",
+   "dorsal": 9
+  },
+  {
+   "nombre": "Iago Aspas",
+   "dorsal": 10
+  },
+  {
+   "nombre": "Pablo Durán",
+   "dorsal": 11
+  },
+  {
+   "nombre": "Aleix Febas",
+   "dorsal": 14
+  },
+  {
+   "nombre": "Hugo González",
+   "dorsal": 16
+  },
+  {
+   "nombre": "Javi Rueda",
+   "dorsal": 17
+  },
+  {
+   "nombre": "Yoel Lago",
+   "dorsal": 18
+  },
+  {
+   "nombre": "Williot Swedberg",
+   "dorsal": 19
+  },
+  {
+   "nombre": "Javi Rodríguez",
+   "dorsal": 20
+  },
+  {
+   "nombre": "Sebastián Cáceres",
+   "dorsal": 21
+  },
+  {
+   "nombre": "Javi Galán",
+   "dorsal": 22
+  },
+  {
+   "nombre": "Hugo Álvarez",
+   "dorsal": 23
+  },
+  {
+   "nombre": "Couhaib Driouech",
+   "dorsal": 24
+  },
+  {
+   "nombre": "Andrés Antañón",
+   "dorsal": 28
+  },
+  {
+   "nombre": "Hugo Burcio",
+   "dorsal": 30
+  }
+ ],
+ "bajas": [
+  {
+   "nombre": "Carl Starfelt",
+   "dorsal": 2,
+   "motivo": "lesion"
+  },
+  {
+   "nombre": "Borja Iglesias",
+   "dorsal": 7,
+   "motivo": "lesion"
+  },
+  {
+   "nombre": "Miguel Román",
+   "dorsal": 8,
+   "motivo": "lesion"
+  },
+  {
+   "nombre": "Álvaro Núñez",
+   "dorsal": 15,
+   "motivo": "lesion"
+  },
+  {
+   "nombre": "Jones El-Abdellaoui",
+   "dorsal": 39,
+   "motivo": "lesion"
+  }
+ ],
+ "_rival_texto": "Levante UD",
+ "logo": "laliga"
+}

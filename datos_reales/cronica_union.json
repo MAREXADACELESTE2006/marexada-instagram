@@ -1,0 +1,19 @@
+{
+ "tipo": "resultado",
+ "competicion": "europa",
+ "local": "celta-vigo",
+ "visitante": "union-saint-gilloise",
+ "jornada": "Xornada 4",
+ "lugar": "Balaídos",
+ "goles_local": 1,
+ "goles_visitante": 2,
+ "goleadores_local": [
+  "Pablo Durán 11'"
+ ],
+ "goleadores_visitante": [
+  "Besfort Zeneli 35'",
+  "Besfort Zeneli 49'"
+ ],
+ "logo": "europa",
+ "fecha_hora": "Xov 05/11"
+}

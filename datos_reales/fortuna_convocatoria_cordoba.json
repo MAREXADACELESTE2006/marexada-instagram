@@ -1,0 +1,130 @@
+{
+ "tipo": "convocatoria",
+ "competicion": "liga",
+ "local": "celta-vigo",
+ "visitante": "cordoba",
+ "jornada": "Hypermotion · Xornada 12",
+ "lugar": "Balaídos",
+ "fecha_hora": "Sáb 31/10 · 18:30",
+ "convocados": [
+  {
+   "nombre": "Coke Carrillo",
+   "dorsal": 1
+  },
+  {
+   "nombre": "Caio Barone",
+   "dorsal": 13
+  },
+  {
+   "nombre": "Marcos González",
+   "dorsal": 25
+  },
+  {
+   "nombre": "Pablo Gavián",
+   "dorsal": 2
+  },
+  {
+   "nombre": "Quique Ribes",
+   "dorsal": 3
+  },
+  {
+   "nombre": "Seyni Ndiaye",
+   "dorsal": 4
+  },
+  {
+   "nombre": "Álvaro Marín",
+   "dorsal": 9
+  },
+  {
+   "nombre": "Óscar Marcos",
+   "dorsal": 10
+  },
+  {
+   "nombre": "Ángel Arcos",
+   "dorsal": 11
+  },
+  {
+   "nombre": "Jan Oliveras",
+   "dorsal": 14
+  },
+  {
+   "nombre": "Aldrine Kibet",
+   "dorsal": 15
+  },
+  {
+   "nombre": "Adrià Capdevila",
+   "dorsal": 16
+  },
+  {
+   "nombre": "Joel López",
+   "dorsal": 18
+  },
+  {
+   "nombre": "Ángel Davila",
+   "dorsal": 19
+  },
+  {
+   "nombre": "Stefan Bajčetić",
+   "dorsal": 22
+  },
+  {
+   "nombre": "Germain Milla",
+   "dorsal": 23
+  },
+  {
+   "nombre": "Jorge Pérez-Lafuente",
+   "dorsal": 26
+  },
+  {
+   "nombre": "Noah Rodríguez",
+   "dorsal": 27
+  },
+  {
+   "nombre": "Vlad Silva",
+   "dorsal": 28
+  },
+  {
+   "nombre": "Mateo Sobral",
+   "dorsal": 29
+  },
+  {
+   "nombre": "David Sueiro",
+   "dorsal": 33
+  },
+  {
+   "nombre": "Pablo Rodríguez",
+   "dorsal": 34
+  }
+ ],
+ "bajas": [
+  {
+   "nombre": "Bernard Somuah",
+   "dorsal": 7,
+   "motivo": "lesion"
+  },
+  {
+   "nombre": "Hugo Cuenca",
+   "dorsal": 17,
+   "motivo": "lesion"
+  },
+  {
+   "nombre": "Anxo Rodríguez",
+   "dorsal": 20,
+   "motivo": "lesion"
+  },
+  {
+   "nombre": "Alexis Olmedo",
+   "dorsal": 21,
+   "motivo": "lesion"
+  },
+  {
+   "nombre": "Pablo Meixús",
+   "dorsal": 6,
+   "motivo": "sancion"
+  }
+ ],
+ "_rival_texto": "Córdoba CF",
+ "logo": "hypermotion",
+ "tag": "CELTA FORTUNA",
+ "local_nombre": "CELTA FORTUNA"
+}

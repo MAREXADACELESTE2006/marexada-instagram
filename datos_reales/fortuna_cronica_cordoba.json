@@ -1,0 +1,22 @@
+{
+ "tipo": "resultado",
+ "competicion": "liga",
+ "local": "celta-vigo",
+ "visitante": "cordoba",
+ "jornada": "Hypermotion · Xornada 12",
+ "lugar": "Balaídos",
+ "goles_local": 2,
+ "goles_visitante": 2,
+ "goleadores_local": [
+  "Kibet 24'",
+  "Álvaro Marín 56'"
+ ],
+ "goleadores_visitante": [
+  "Diego Bri 26'",
+  "Víctor Sánchez 73'"
+ ],
+ "logo": "hypermotion",
+ "fecha_hora": "Sáb 31/10",
+ "tag": "CELTA FORTUNA",
+ "local_nombre": "CELTA FORTUNA"
+}

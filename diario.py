@@ -1,0 +1,267 @@
+"""Marexada Celeste · programa diario de historias de Instagram (v13) — MODO REVISIÓN.
+
+Cada día (lo ejecuta GitHub Actions, ver INSTALAR.md) este programa:
+  1. lee las fuentes: noticias de rccelta.es (convocatorias y crónicas), calendario y resultados del Celta/Fortuna (ESPN/TheSportsDB), clasificaciones y AS Celtas Fem (besoccer);
+  2. decide qué historias tocan hoy según el calendario semanal;
+  3. genera las imágenes (1080x1920) en  salida/AAAA-MM-DD/  con un  resumen.md  (hora sugerida y texto para cada una);
+  4. apunta lo generado en  estado/publicado.json  para no repetir nada;
+  5. si hay Telegram configurado, te manda las historias al móvil para revisarlas y subirlas.
+NO publica en Instagram: las subes tú tras revisarlas.
+
+Uso:
+    python diario.py                       (hoy, leyendo internet)
+    python diario.py --offline --hoy 2026-11-08      (prueba sin internet con los datos de ejemplo de fixtures/)
+Opciones: --forzar (ignora lo ya generado), --sin-estado (no actualiza estado/publicado.json), --sin-telegram.
+"""
+import argparse
+import datetime
+import json
+import os
+import re
+import shutil
+import unicodedata
+import subprocess
+import sys
+import urllib.request
+import uuid
+from zoneinfo import ZoneInfo
+
+BASE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, BASE)
+MADRID = ZoneInfo("Europe/Madrid")
+ESTADO = os.path.join(BASE, "estado", "publicado.json")
+HASHTAGS = "#RCCelta #Celta #MarexadaCeleste"
+
+RECORDATORIOS = {
+    0: ["Noticia do día (mañá, de rccelta.es)"],
+    1: ["Noticia do día (mañá, de rccelta.es)", "Celta Fortuna / cantera (tarde, de rccelta.es)"],
+    2: ["Noticia do día (mañá, de rccelta.es)", "Efeméride (tarde, contido propio)"],
+    3: ["Noticia do día (mañá, de rccelta.es)"],
+    4: ["Convocatoria (tarde, cando a publique o club)"],
+    5: ["Aniversarios ou goleadores (mañá)", "Contido de peña: viaxe, merchandising, socios (tarde)"],
+    6: ["Entradas / abonos ou peña (mañá)", "Resumo da semana (tarde)"],
+}
+
+
+# ---------------------------------------------------------------- utilidades
+def cargar(ruta):
+    try:
+        return json.load(open(ruta, encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def fecha_de(d):
+    try:
+        return datetime.date.fromisoformat(d["_fecha"])
+    except (KeyError, ValueError, TypeError):
+        return None
+
+
+def correr(script, args, etiqueta, avisos):
+    try:
+        r = subprocess.run([sys.executable, os.path.join(BASE, script), *args], capture_output=True, text=True, timeout=240)
+    except subprocess.TimeoutExpired:
+        avisos.append(f"{etiqueta}: tardó demasiado y se cortó")
+        return False
+    if r.returncode != 0:
+        ultima = ((r.stderr or r.stdout).strip().splitlines() or ["sin detalle"])[-1]
+        avisos.append(f"{etiqueta}: {ultima}")
+    return r.returncode == 0
+
+
+def nombre_lado(d, lado):
+    import generar_historia as H
+    return H.nombre(d, lado)
+
+
+def hora_previa(d):
+    m = re.search(r"(\d{1,2}):(\d{2})", d.get("fecha_hora", ""))
+    if not m:
+        return None
+    return f"{(int(m.group(1)) - d.get('horas_antes', 2)) % 24:02d}:{m.group(2)}"
+
+
+def etiquetas(nombre):
+    return "#ASCeltas #MarexadaCeleste" if nombre == "as-celtas-fem" else HASHTAGS
+
+
+# ---------------------------------------------------------------- qué toca hoy
+def plan(hoy, datos, avisos):
+    """Devuelve una lista de historias: clave (para no repetir), fichero de datos, momento, hora sugerida y texto."""
+    wd = hoy.weekday()
+    out = []
+
+    def add(clave, fichero, momento, hora, texto):
+        out.append({"clave": clave, "fichero": fichero, "momento": momento, "hora": hora, "texto": texto})
+
+    previa = datos.get("previa_hoy.json")
+    if previa:
+        hp = hora_previa(previa)
+        add(f"previa-{previa['fecha_hora']}", "previa_hoy.json", "previa", "primeira hora da mañá",
+            f"Hoxe hai previa na nosa sede, a Cafetería Kiev, ás {hp} h! Veña tomar algo antes do "
+            f"{nombre_lado(previa, 'local')} - {nombre_lado(previa, 'visitante')} 🍻 {HASHTAGS}")
+
+    for nombre, fichero in (("celta", "proximo_celta.json"), ("fortuna", "proximo_fortuna.json"), ("as-celtas-fem", "proximo_as_celtas_fem.json")):
+        d = datos.get(fichero)
+        f = fecha_de(d)
+        if not d or not f or not (0 <= (f - hoy).days <= 1):
+            continue
+        if nombre == "celta" and previa and f == hoy:
+            continue                                   # el día del partido en casa ya sale la previa
+        cuando = "Hoxe" if f == hoy else "Mañá"
+        add(f"proximo-{nombre}-{d['fecha_hora']}", fichero, "mañana", "10:00",
+            f"{cuando} xogamos! {nombre_lado(d, 'local')} - {nombre_lado(d, 'visitante')}, {d['fecha_hora']}. Forza! 💙 {etiquetas(nombre)}")
+
+    def corto(d):
+        return re.sub(r"[^a-z0-9]+", "-", (d.get("_url") or "").rstrip("/").split("/")[-1].lower())[:60]
+
+    con_cronica = set()
+    for nombre in ("celta", "fortuna"):
+        c = datos.get(f"convocatoria_{nombre}.json")
+        f = fecha_de(c)
+        if c and f and 0 <= (hoy - f).days <= 1:
+            add(f"convocatoria-{nombre}-{corto(c)}", f"convocatoria_{nombre}.json", "tarde", "cando a publica o club (ou a tarde)",
+                f"Convocatoria: {nombre_lado(c, 'local')} - {nombre_lado(c, 'visitante')}, {c['fecha_hora']}. Estes son os convocados! 💙 {etiquetas(nombre)}")
+        k = datos.get(f"cronica_{nombre}.json")
+        f = fecha_de(k)
+        if k and f and 0 <= (hoy - f).days <= 1:
+            con_cronica.add(nombre)
+            add(f"cronica-{nombre}-{corto(k)}", f"cronica_{nombre}.json", "resultado", "xusto ao rematar o partido",
+                f"Final: {nombre_lado(k, 'local')} {k['goles_local']} - {k['goles_visitante']} {nombre_lado(k, 'visitante')}. 💙 {etiquetas(nombre)}"
+                " (Versión con goleadores: se xa subiches a do marcador, substitúea.)")
+
+    for nombre, fichero in (("celta", "resultado_celta.json"), ("fortuna", "resultado_fortuna.json"), ("as-celtas-fem", "resultado_as_celtas_fem.json")):
+        r = datos.get(fichero)
+        f = fecha_de(r)
+        if not r or not f or not (0 <= (hoy - f).days <= 1) or nombre in con_cronica:
+            continue                                   # si hay crónica (con goleadores) no se saca la del marcador
+        cierre = "Orgullosas do AS Celtas!" if nombre == "as-celtas-fem" else "Forza Celta!"
+        add(f"resultado-{nombre}-{r['fecha_hora']}-{r['goles_local']}-{r['goles_visitante']}", fichero, "resultado", "xusto ao rematar o partido",
+            f"Final: {nombre_lado(r, 'local')} {r['goles_local']} - {r['goles_visitante']} {nombre_lado(r, 'visitante')}. {cierre} 💙 {etiquetas(nombre)}")
+
+    tabla = {0: ("clasificacion_celta_laliga.json", "laliga", "LaLiga"), 1: ("clasificacion_celta_fortuna.json", "fortuna", "LaLiga Hypermotion (Celta Fortuna)"),
+             3: ("clasificacion_as_celtas_fem.json", "as-celtas-fem", "Segunda Federación Femenina (AS Celtas)")}.get(wd)
+    if tabla:
+        d = datos.get(tabla[0])
+        if d:
+            add(f"clasificacion-{tabla[1]}-{d['jornada']}", tabla[0], "tarde", "19:00",
+                f"Así está a clasificación de {tabla[2]} tras a {d['jornada'].lower()}. 💙 {etiquetas(tabla[1])}")
+    return out
+
+
+# ---------------------------------------------------------------- Telegram (opcional)
+def telegram(historias, resumen, avisos):
+    token, chat = os.environ.get("TELEGRAM_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
+    if not token or not chat:
+        return False
+
+    def llamar(metodo, campos, archivo=None):
+        b = uuid.uuid4().hex
+        cuerpo = b""
+        for k, v in campos.items():
+            cuerpo += f'--{b}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode("utf-8")
+        if archivo:
+            cuerpo += (f'--{b}\r\nContent-Disposition: form-data; name="photo"; filename="{os.path.basename(archivo)}"\r\n'
+                       f'Content-Type: image/jpeg\r\n\r\n').encode() + open(archivo, "rb").read() + b"\r\n"
+        cuerpo += f"--{b}--\r\n".encode()
+        req = urllib.request.Request(f"https://api.telegram.org/bot{token}/{metodo}", data=cuerpo,
+                                     headers={"Content-Type": f"multipart/form-data; boundary={b}"})
+        urllib.request.urlopen(req, timeout=60).read()
+
+    try:
+        llamar("sendMessage", {"chat_id": chat, "text": resumen[:4000]})
+        for h in historias:
+            llamar("sendPhoto", {"chat_id": chat, "caption": f"{h['hora']} · {h['texto']}"[:1000]}, h["imagen"])
+        return True
+    except Exception as e:
+        avisos.append(f"Telegram: {e}")
+        return False
+
+
+# ---------------------------------------------------------------- principal
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--hoy", default=None, help="AAAA-MM-DD (por defecto, hoy en Madrid)")
+    ap.add_argument("--offline", action="store_true", help="usa los datos de ejemplo de fixtures/ en vez de internet")
+    ap.add_argument("--forzar", action="store_true")
+    ap.add_argument("--sin-estado", action="store_true")
+    ap.add_argument("--sin-telegram", action="store_true")
+    ap.add_argument("--salida", default=os.path.join(BASE, "salida"))
+    a = ap.parse_args()
+    hoy = datetime.date.fromisoformat(a.hoy) if a.hoy else datetime.datetime.now(MADRID).date()
+    carpeta = os.path.join(a.salida, hoy.isoformat())
+    d_datos = os.path.join(carpeta, "datos")
+    shutil.rmtree(carpeta, ignore_errors=True)
+    os.makedirs(d_datos)
+    avisos = []
+
+    fx = lambda n: os.path.join(BASE, "fixtures", n)
+    if a.offline:
+        fuentes = [
+            ("calendario.py", ["--desde", fx("partidos_api_EJEMPLO.json"), "--ahora", f"{hoy.isoformat()}T06:00:00", "--salida", d_datos], "Calendario"),
+            ("clasificaciones.py", ["--desde", fx("web_respaldo_jornada8_LL_EL_HM.json"), "--salida", d_datos], "Clasificaciones"),
+            ("noticias.py", ["--desde", fx("rccelta_web_RECONSTRUIDO"), "--salida", d_datos], "Noticias rccelta.es"),
+            ("resultados.py", ["--desde", fx("espn_resultados_EJEMPLO.json"), "--ahora", f"{hoy.isoformat()}T06:00:00", "--salida", d_datos], "Resultados Celta/Fortuna"),
+            ("besoccer.py", ["--clasif", fx("besoccer_clasificacion_RECONSTRUIDO.html"), "--partidos", fx("besoccer_partidos_RECONSTRUIDO.html"),
+                             "--hoy", hoy.isoformat(), "--salida", d_datos], "AS Celtas Fem (besoccer)"),
+        ]
+    else:
+        ahora = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+        fuentes = [
+            ("calendario.py", ["--ahora", ahora, "--salida", d_datos], "Calendario"),
+            ("clasificaciones.py", ["--salida", d_datos], "Clasificaciones"),
+            ("noticias.py", ["--salida", d_datos], "Noticias rccelta.es"),
+            ("resultados.py", ["--ahora", ahora, "--salida", d_datos], "Resultados Celta/Fortuna"),
+            ("besoccer.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "AS Celtas Fem (besoccer)"),
+        ]
+    ok = [correr(s, args, etq, avisos) for s, args, etq in fuentes]
+
+    datos = {f: cargar(os.path.join(d_datos, f)) for f in os.listdir(d_datos) if f.endswith(".json")}
+    estado = cargar(ESTADO) or {}
+    historias = []
+    for h in plan(hoy, datos, avisos):
+        if h["clave"] in estado and not a.forzar:
+            continue
+        historias.append(h)
+
+    import generar
+    for i, h in enumerate(historias, 1):
+        limpio = re.sub(r"[^a-z0-9]+", "-", unicodedata.normalize("NFKD", h["clave"]).encode("ascii", "ignore").decode().lower()).strip("-")[:50]
+        h["imagen"] = os.path.join(carpeta, f"{i:02d}_{limpio}.jpg")
+        try:
+            generar.generar(os.path.join(d_datos, h["fichero"]), h["imagen"])
+        except Exception as e:
+            avisos.append(f"No se pudo generar {h['clave']}: {e}")
+            h["imagen"] = None
+    historias = [h for h in historias if h["imagen"]]
+
+    dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    L = [f"# Historias de {dias[hoy.weekday()]} {hoy.strftime('%d/%m/%Y')}", ""]
+    if historias:
+        L += ["| Hora sugerida | Imagen | Texto sugerido |", "|---|---|---|"]
+        L += [f"| {h['hora']} | {os.path.basename(h['imagen'])} | {h['texto']} |" for h in historias]
+    else:
+        L.append("Hoy no hay historias automáticas nuevas.")
+    L += ["", "## Contido propio que toca hoxe (aínda sen automatizar)"] + [f"- {r}" for r in RECORDATORIOS[hoy.weekday()]]
+    L += ["- Aliñación do Celta e do Fortuna: non se xera (non fai falta)."]
+    if avisos:
+        L += ["", "## Avisos"] + [f"- {x}" for x in avisos]
+    resumen = "\n".join(L) + "\n"
+    open(os.path.join(carpeta, "resumen.md"), "w", encoding="utf-8").write(resumen)
+
+    if not a.sin_telegram and not a.offline:
+        telegram(historias, resumen, avisos)
+    if not a.sin_estado and not a.offline:
+        for h in historias:
+            estado[h["clave"]] = hoy.isoformat()
+        os.makedirs(os.path.dirname(ESTADO), exist_ok=True)
+        json.dump(dict(sorted(estado.items())[-400:]), open(ESTADO, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+
+    print(resumen)
+    if not any(ok):
+        sys.exit("ERROR: fallaron las tres fuentes de datos (revisa los avisos).")
+
+
+if __name__ == "__main__":
+    main()

@@ -11,7 +11,7 @@ El programa diario la usa para sacar la historia solo cuando el parte cambia.
 
 Uso:
     python partemedico.py                                   (lee internet)
-    python partemedico.py --desde fixtures/partemedico_RECONSTRUIDO --salida carpeta   (prueba sin internet)
+    python partemedico.py --desde fixtures/partemedico_REAL --salida carpeta   (prueba sin internet)
 Si la página cambia y no se entiende, guarda lo recibido en partemedico_*_DEBUG.html para poder ajustarlo.
 """
 import argparse
@@ -33,7 +33,7 @@ EQUIPOS = {
                                                    "https://rccelta.es/en/equipos/celta-fortuna/parte-medico/"]},
 }
 POR_IMAGEN = 7
-SALTAR = {"script", "style", "noscript", "svg", "button"}
+SALTAR = {"script", "style", "noscript"}      # (svg/button no: hay svg sin cerrar y el contador se atascaba)
 ETIQUETAS = (("diagnostico", re.compile(r"^(diagn[oó]stic[oa]?|diagnosis)\W*$", re.I)), ("lugar", re.compile(r"^(lugar|place|location)\W*$", re.I)),
              ("tratamiento", re.compile(r"^(tratamiento|tratamento|treatment)\W*$", re.I)),
              ("observaciones", re.compile(r"^(observaciones|observaci[oó]ns|observacions|observations|remarks|notes)\W*$", re.I)))

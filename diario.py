@@ -173,8 +173,18 @@ def plan(hoy, datos, avisos):
             continue
         partido = en.get("partido") or "o próximo partido"
         primero = (" " + en["puntos"][0] + ".") if en.get("puntos") else ""
+        que = "entradas para os afeccionados visitantes" if en.get("visitantes") else "entradas"
         add(f"entradas-{en['nombre']}", fichero, "mañana", "canto antes (para avisar aos peñistas)",
-            f"🎟️ Xa hai entradas para o {partido}!{primero} Todos os detalles: {en.get('url', 'rccelta.es')} {etiquetas('celta')}")
+            f"🎟️ Xa hai {que} para o {partido}!{primero} Todos os detalles: {en.get('url', 'rccelta.es')} {etiquetas('celta')}")
+
+    # Cumpleaños: una historia por cada jugador o miembro del cuerpo técnico que cumple años hoy (datos en cumpleanos.json).
+    for fichero in sorted(f for f in datos if re.fullmatch(r"cumpleanos_.+\.json", f)):
+        c = datos[fichero]
+        if not c or not c.get("nombre"):
+            continue
+        quien = f"o noso adestrador {c['nombre']}" if "adestrador" in (c.get("posicion") or "").lower() else c["nombre"]
+        add(f"cumple-{fichero[10:-5]}-{c.get('año', hoy.year)}", fichero, "mañana", "09:00",
+            f"🎂 Hoxe cumpre {c['edad']} anos {quien}! Moitas felicidades e que cumpra moitos máis co celeste no peito 💙 {etiquetas(c.get('equipo', 'celta'))}")
     return out
 
 
@@ -235,6 +245,7 @@ def main():
                              "--hoy", hoy.isoformat(), "--salida", d_datos], "AS Celtas Fem (besoccer)"),
             ("partemedico.py", ["--desde", fx("partemedico_REAL"), "--salida", d_datos], "Parte médico (rccelta.es)"),
             ("entradas.py", ["--hoy", hoy.isoformat(), "--desde", fx("entradas_RECONSTRUIDO"), "--salida", d_datos], "Entradas (rccelta.es)"),
+            ("cumpleanos.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Cumpleaños"),
         ]
     else:
         ahora = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
@@ -246,6 +257,7 @@ def main():
             ("futbolme.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "AS Celtas Fem (futbolme)"),
             ("partemedico.py", ["--salida", d_datos], "Parte médico (rccelta.es)"),
             ("entradas.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Entradas (rccelta.es)"),
+            ("cumpleanos.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Cumpleaños"),
         ]
     ok = [correr(s, args, etq, avisos) for s, args, etq in fuentes]
 

@@ -1,0 +1,211 @@
+{
+ "_leeme": "Cumpleaños de la plantilla. Para añadir uno copia una línea, cambia nombre, posicion, equipo (celta o fortuna) y nacimiento (AAAA-MM-DD). Las líneas con \"pendiente\": true no se usan.",
+ "personas": [
+  {
+   "nombre": "Ionuț Radu",
+   "posicion": "Porteiro",
+   "equipo": "celta",
+   "nacimiento": "1997-05-28"
+  },
+  {
+   "nombre": "Altay Bayındır",
+   "posicion": "Porteiro",
+   "equipo": "celta",
+   "nacimiento": "1998-04-14"
+  },
+  {
+   "nombre": "Iván Villar",
+   "posicion": "Porteiro",
+   "equipo": "celta",
+   "nacimiento": "1997-07-09"
+  },
+  {
+   "nombre": "Carl Starfelt",
+   "posicion": "Defensa",
+   "equipo": "celta",
+   "nacimiento": "1995-06-01"
+  },
+  {
+   "nombre": "Marcos Alonso",
+   "posicion": "Defensa",
+   "equipo": "celta",
+   "nacimiento": "1990-12-28"
+  },
+  {
+   "nombre": "Abdoulaye Faye",
+   "posicion": "Defensa",
+   "equipo": "celta",
+   "nacimiento": "2004-02-26"
+  },
+  {
+   "nombre": "Sebastián Cáceres",
+   "posicion": "Defensa",
+   "equipo": "celta",
+   "nacimiento": "1999-08-18"
+  },
+  {
+   "nombre": "Yoel Lago",
+   "posicion": "Defensa",
+   "equipo": "celta",
+   "nacimiento": "2004-10-14"
+  },
+  {
+   "nombre": "Javi Rodríguez",
+   "posicion": "Defensa",
+   "equipo": "celta",
+   "nacimiento": "2003-03-20"
+  },
+  {
+   "nombre": "Javi Galán",
+   "posicion": "Defensa / Lateral",
+   "equipo": "celta",
+   "nacimiento": "1994-11-19"
+  },
+  {
+   "nombre": "Sergio Carreira",
+   "posicion": "Defensa / Lateral",
+   "equipo": "celta",
+   "nacimiento": "2000-10-13"
+  },
+  {
+   "nombre": "Javi Rueda",
+   "posicion": "Defensa / Lateral",
+   "equipo": "celta",
+   "nacimiento": "2002-06-05"
+  },
+  {
+   "nombre": "Álvaro Núñez",
+   "posicion": "Defensa / Lateral",
+   "equipo": "celta",
+   "nacimiento": "2000-07-07"
+  },
+  {
+   "nombre": "Ilaix Moriba",
+   "posicion": "Centrocampista",
+   "equipo": "celta",
+   "nacimiento": "2003-01-19"
+  },
+  {
+   "nombre": "Miguel Román",
+   "posicion": "Centrocampista",
+   "equipo": "celta",
+   "nacimiento": "2003-03-06"
+  },
+  {
+   "nombre": "Aleix Febas",
+   "posicion": "Centrocampista",
+   "equipo": "celta",
+   "nacimiento": "1996-02-02"
+  },
+  {
+   "nombre": "Williot Swedberg",
+   "posicion": "Centrocampista / Extremo",
+   "equipo": "celta",
+   "nacimiento": "2004-02-01"
+  },
+  {
+   "nombre": "Hugo Álvarez",
+   "posicion": "Centrocampista / Extremo",
+   "equipo": "celta",
+   "nacimiento": "2003-07-02"
+  },
+  {
+   "nombre": "Couhaib Driouech",
+   "posicion": "Extremo",
+   "equipo": "celta",
+   "nacimiento": "2002-04-17"
+  },
+  {
+   "nombre": "Ferran Jutglà",
+   "posicion": "Dianteiro / Extremo",
+   "equipo": "celta",
+   "nacimiento": "1999-02-25"
+  },
+  {
+   "nombre": "Jones El-Abdellaoui",
+   "posicion": "Extremo",
+   "equipo": "celta",
+   "nacimiento": "2006-01-12"
+  },
+  {
+   "nombre": "Hugo González",
+   "posicion": "Extremo",
+   "equipo": "celta",
+   "nacimiento": "2003-03-07"
+  },
+  {
+   "nombre": "Pablo Durán",
+   "posicion": "Dianteiro",
+   "equipo": "celta",
+   "nacimiento": "2001-05-03"
+  },
+  {
+   "nombre": "Borja Iglesias",
+   "posicion": "Dianteiro",
+   "equipo": "celta",
+   "nacimiento": "1993-01-17"
+  },
+  {
+   "nombre": "Iago Aspas",
+   "posicion": "Dianteiro",
+   "equipo": "celta",
+   "nacimiento": "1987-08-01"
+  },
+  {
+   "nombre": "Coke Carrillo",
+   "posicion": "Porteiro",
+   "equipo": "fortuna",
+   "nacimiento": "2002-01-07"
+  },
+  {
+   "nombre": "Caio Barone",
+   "posicion": "Porteiro",
+   "equipo": "fortuna",
+   "nacimiento": "2006-05-04"
+  },
+  {
+   "nombre": "Joel López",
+   "posicion": "Defensa (Lateral esquerdo)",
+   "equipo": "fortuna",
+   "nacimiento": "2002-03-31"
+  },
+  {
+   "nombre": "Andrés Antañón",
+   "posicion": "Centrocampista",
+   "equipo": "fortuna",
+   "nacimiento": "2007-01-22"
+  },
+  {
+   "nombre": "Óscar Marcos",
+   "posicion": "Centrocampista ofensivo",
+   "equipo": "fortuna",
+   "nacimiento": "2006-02-19"
+  },
+  {
+   "nombre": "Stefan Bajcetic",
+   "posicion": "Pivote",
+   "equipo": "fortuna",
+   "nacimiento": "2004-10-22"
+  },
+  {
+   "nombre": "Fredi Álvarez",
+   "posicion": "Adestrador",
+   "equipo": "fortuna",
+   "nacimiento": "1976-02-27"
+  },
+  {
+   "nombre": "Ángel Arcos",
+   "posicion": "",
+   "equipo": "fortuna",
+   "nacimiento": "2006-04-18"
+  },
+  {
+   "nombre": "Hugo Burcio",
+   "posicion": "Centrocampista",
+   "equipo": "celta",
+   "nacimiento": "2006-05-22",
+   "pendiente": true,
+   "nota": "PENDIENTE: la lista del primer equipo dice 22/05/2006 y la del Fortuna 31/10/2006. Quita la línea \"pendiente\" cuando sepas cuál es la buena."
+  }
+ ]
+}

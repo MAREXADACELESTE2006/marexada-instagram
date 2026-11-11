@@ -27,6 +27,7 @@ import urllib.request
 from html.parser import HTMLParser
 
 import partemedico as pm                                  # reutiliza el conversor HTML -> líneas de texto
+import rccelta                                            # nombre de equipo -> escudo
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 RAIZ = "https://rccelta.es"
@@ -208,6 +209,14 @@ def _corta(t, n):
     return t[:n].rsplit(" ", 1)[0].rstrip(",;:") + "…"
 
 
+def _lado(nombre_equipo):
+    """(nombre para mostrar, escudo) de un lado del partido. El Celta y el Celta Fortuna llevan el escudo del Celta."""
+    n = _limpia(nombre_equipo)
+    if re.search(r"\bcelta\b", n, re.I) and not re.search(r"as celtas", n, re.I):
+        return ("Celta Fortuna" if re.search(r"fortuna", n, re.I) else "Celta"), "celta-vigo"
+    return n, rccelta.slug_equipo(n)
+
+
 def articulo(html, nombre, hoy):
     """Lee una noticia. Devuelve un diccionario o None si no es de entradas de Celta/Fortuna."""
     titulo = _meta(html, "og:title") or ""
@@ -262,7 +271,15 @@ def articulo(html, nombre, hoy):
                 puntos.append(_corta(f, 150))
     if not (partido or puntos):
         return None
-    return {"tipo": "entradas", "competicion": "liga", "tag": "CELTA FORTUNA" if re.search(r"fortuna", nombre + titulo, re.I) else "REAL CLUB CELTA",
+    lado = {}
+    if partido:
+        pp = re.split(r"\s+[-–—]\s+", partido, maxsplit=1)
+        if len(pp) == 2:
+            (ln, ls), (vn, vs) = _lado(pp[0]), _lado(pp[1])
+            lado = {"local": ls, "visitante": vs, "local_nombre": ln, "visitante_nombre": vn}
+            fuera = bool(re.search(r"celta", vn, re.I)) and not re.search(r"celta", ln, re.I)
+            lado["visitantes"] = fuera or bool(re.search(r"visitante|desplazamiento", nombre + " " + titulo, re.I))
+    return {"tipo": "entradas", "competicion": "liga", **lado, "tag": "CELTA FORTUNA" if re.search(r"fortuna", nombre + titulo, re.I) else "REAL CLUB CELTA",
             "nombre": nombre, "url": f"{RAIZ}/club/actualidad/{nombre}/", "titulo": titulo, "partido": partido, "publicada": fecha.isoformat() if fecha else None,
             "partido_fecha_hora": partido_dt.strftime("%Y-%m-%dT%H:%M") if partido_dt else None,
             "jornada": int(jornada.group(1)) if jornada else None, "torneo": competicion.group(1) if competicion else None,

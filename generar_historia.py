@@ -411,49 +411,75 @@ def partemedico(datos):
 # ---------------------------------------------------------------- entradas a la venta
 def entradas(datos):
     img = fondo(); d = ImageDraw.Draw(img)
-    center(d, 110, datos.get("tag", ""), font(44), fill=AZUL)
-    center(d, 165, "ENTRADAS", fit(d, "ENTRADAS", 110, W - 100))
-    partido = datos.get("partido") or datos.get("titulo", "")
-    partes = re.split(r"\s+[-–—]\s+", partido, maxsplit=1)
-    y = 330
-    if len(partes) == 2:
-        center(d, y, partes[0], fit(d, partes[0], 72, W - 100, 40))
-        center(d, y + 92, "VS", font(34), fill=AZUL)
-        center(d, y + 142, partes[1], fit(d, partes[1], 72, W - 100, 40))
-        y += 270
+    titulo = "ENTRADAS VISITANTES" if datos.get("visitantes") else "ENTRADAS"
+    cabecera(img, d, datos.get("tag", ""), titulo, None, ytitulo=205)
+    cy = 575
+    if datos.get("local_nombre") and datos.get("visitante_nombre"):
+        escudo(img, 215, cy, datos.get("local"), siglas(datos["local_nombre"]))
+        escudo(img, 865, cy, datos.get("visitante"), siglas(datos["visitante_nombre"]))
+        center(d, cy - 43, "VS", font(80), fill=AZUL)
+        nombres_bajo_escudos(d, datos, y=cy + 190)
+        y = cy + 190 + 56 * 2 + 40
     else:
-        for l in _lineas(d, partido, font(60), W - 120, 3):
-            center(d, y, l, font(60)); y += 76
-        y += 30
+        for l in _lineas(d, datos.get("partido") or datos.get("titulo", ""), font(60), W - 120, 3):
+            center(d, 430, l, font(60))
+        y = cy + 190 + 56 * 2 + 40
     sub = " · ".join(x for x in (datos.get("torneo"), f"Xornada {datos['jornada']}" if datos.get("jornada") else None) if x)
     if sub:
-        center(d, y, sub, fit(d, sub, 36, W - 100, 24), fill=AZUL); y += 64
+        center(d, y, sub, fit(d, sub, 36, W - 100, 24), fill=(200, 218, 240)); y += 56
     ph = datos.get("partido_fecha_hora")
     if ph:
         dt = datetime.datetime.fromisoformat(ph)
         dias = ["luns", "martes", "mércores", "xoves", "venres", "sábado", "domingo"]
         cad = f"{dias[dt.weekday()].capitalize()} {dt.day:02d}/{dt.month:02d} · {dt:%H:%M} h"
-        center(d, y, cad, fit(d, cad, 50, W - 100, 30)); y += 90
-    y = max(y + 30, 800)
-    fd = font_m(34)
+        center(d, y, cad, fit(d, cad, 52, W - 100, 30), fill=AZUL); y += 84
+    y = max(y + 14, 1050)
+    fd = font_m(32)
     for i, texto in enumerate(datos.get("puntos", [])[:3], 1):
         cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        ImageDraw.Draw(cap).rounded_rectangle([40, y, W - 40, y + 150], 14, fill=(255, 255, 255, 30))
+        ImageDraw.Draw(cap).rounded_rectangle([40, y, W - 40, y + 130], 14, fill=(255, 255, 255, 30))
         img.paste(cap, (0, 0), cap)
         d = ImageDraw.Draw(img)
-        cx, cy = 105, y + 75
-        d.ellipse([cx - 36, cy - 36, cx + 36, cy + 36], fill=AZUL)
-        center(d, cy - 30, str(i), font(44), fill=(10, 35, 57), x=cx)
-        lineas = _lineas(d, texto, fd, 800, 3)
-        yy = cy - (len(lineas) * 44) // 2
+        cx, cyp = 100, y + 65
+        d.ellipse([cx - 32, cyp - 32, cx + 32, cyp + 32], fill=AZUL)
+        center(d, cyp - 27, str(i), font(40), fill=(10, 35, 57), x=cx)
+        lineas = _lineas(d, texto, fd, 820, 3)
+        yy = cyp - (len(lineas) * 40) // 2
         for l in lineas:
-            d.text((170, yy), l, font=fd, fill=WHITE)
-            yy += 44
-        y += 172
-    center(d, y + 40, "Máis información en rccelta.es", font(34), fill=AZUL)
+            d.text((160, yy), l, font=fd, fill=WHITE)
+            yy += 40
+        y += 148
     pie(img, d)
     return img
 
+
+# ---------------------------------------------------------------- cumpleaños
+def cumpleanos(datos):
+    img = fondo(); d = ImageDraw.Draw(img)
+    cabecera(img, d, datos.get("tag", ""), "FELIZ ANIVERSARIO", None, ytitulo=205)
+    cx, cy, r = W // 2, 640, 230
+    sombra = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(sombra).ellipse([cx - r + 6, cy - r + 16, cx + r + 6, cy + r + 16], fill=(0, 0, 0, 90))
+    sombra = sombra.filter(ImageFilter.GaussianBlur(12))
+    img.paste(sombra, (0, 0), sombra)
+    d = ImageDraw.Draw(img)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=AZUL)
+    d.ellipse([cx - r + 14, cy - r + 14, cx + r - 14, cy + r - 14], outline=WHITE, width=6)
+    edad = str(datos.get("edad", ""))
+    fe = font(250 if len(edad) < 3 else 190)
+    bb = d.textbbox((0, 0), edad, font=fe)
+    d.text((cx - (bb[0] + bb[2]) / 2, cy - 45 - (bb[1] + bb[3]) / 2), edad, font=fe, fill=(10, 35, 57))
+    center(d, cy + 105, "ANOS", font(62), fill=(10, 35, 57), x=cx)
+    y = 960
+    for l in _lineas(d, datos.get("nombre", ""), font(96), W - 100, 2):
+        center(d, y, l, fit(d, l, 96, W - 100, 50)); y += 112
+    if datos.get("posicion"):
+        center(d, y + 10, datos["posicion"], fit(d, datos["posicion"], 46, W - 120, 28), fill=AZUL); y += 80
+    if datos.get("fecha"):
+        center(d, y + 30, f"Hoxe, {datos['fecha']}", font(46), fill=(200, 218, 240)); y += 90
+    center(d, max(y + 60, 1380), "Parabéns da Marexada Celeste!", fit(d, "Parabéns da Marexada Celeste!", 52, W - 100, 30))
+    pie(img, d)
+    return img
 
 
 # ---------------------------------------------------------------- previa en la sede
@@ -560,4 +586,4 @@ def previa(datos):
     return img
 
 
-RENDER = {"entradas": entradas, "partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}
+RENDER = {"cumpleanos": cumpleanos, "entradas": entradas, "partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}

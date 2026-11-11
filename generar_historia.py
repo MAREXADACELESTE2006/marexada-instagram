@@ -65,7 +65,8 @@ def etiqueta_equipo(datos):
 
 # ---------------------------------------------------------------- piezas
 _TEMA_BASE = {"navy": NAVY, "acento": AZUL}
-_TEMAS = {"copa": {"navy": (86, 8, 28), "acento": (255, 178, 178)}}   # Copa del Rey: fondo teñido de rojo
+_TEMAS = {"copa": {"navy": (86, 8, 28), "acento": (255, 178, 178)},            # Copa del Rey: fondo teñido de rojo
+          "europa": {"navy": (34, 16, 6), "acento": (255, 150, 48)}}          # Europa League: fondo oscuro cálido y acento naranja
 
 
 def usar_tema(logo=None):
@@ -370,42 +371,69 @@ def _fecha_corta(iso):
     return f"{m.group(3)}/{m.group(2)}/{m.group(1)[2:]}" if m else (iso or "")
 
 
+_MES_GL = {"enero": "xaneiro", "febrero": "febreiro", "marzo": "marzo", "abril": "abril", "mayo": "maio", "junio": "xuño", "julio": "xullo",
+           "agosto": "agosto", "septiembre": "setembro", "octubre": "outubro", "noviembre": "novembro", "diciembre": "decembro"}
+
+
+def _gl(txt):
+    return re.sub(r"[A-Za-zñáéíóú]+", lambda m: _MES_GL.get(m.group(0).lower(), m.group(0)), txt or "")
+
+
+def _dias_baixa(iso, hoy_iso):
+    try:
+        a, b = datetime.date.fromisoformat(iso), datetime.date.fromisoformat(hoy_iso)
+        n = (b - a).days
+        return f"{n} día{'s' if n != 1 else ''}" if n >= 0 else ""
+    except Exception:
+        return ""
+
+
 def partemedico(datos):
     img = fondo(); d = ImageDraw.Draw(img)
-    center(d, 110, datos.get("tag", ""), font(44), fill=AZUL)
-    center(d, 165, "PARTE MÉDICO", fit(d, "PARTE MÉDICO", 86, W - 100))
-    sub = " · ".join(x for x in (("Actualizado: " + datos["actualizado"]) if datos.get("actualizado") else None, datos.get("pagina")) if x)
+    escudo_mini(img, W // 2, 140, "celta-vigo", "RC", r=74)          # escudo del Celta arriba
+    d = ImageDraw.Draw(img)
+    center(d, 232, datos.get("tag", ""), font(40), fill=AZUL)
+    center(d, 268, "PARTE MÉDICO", fit(d, "PARTE MÉDICO", 92, W - 100))
+    d.line([(W // 2 - 190, 408), (W // 2 - 40, 408)], fill=AZUL, width=4)         # filete con cruz médica en el centro
+    d.line([(W // 2 + 40, 408), (W // 2 + 190, 408)], fill=AZUL, width=4)
+    d.rectangle([W // 2 - 4, 394, W // 2 + 4, 422], fill=(214, 48, 49))
+    d.rectangle([W // 2 - 14, 404, W // 2 + 14, 412], fill=(214, 48, 49))
+    sub = " · ".join(x for x in (("Actualizado: " + _gl(datos["actualizado"])) if datos.get("actualizado") else None, datos.get("pagina")) if x)
     if sub:
-        center(d, 285, sub, fit(d, sub, 34, W - 80), fill=(200, 218, 240))
+        center(d, 436, sub, fit(d, sub, 32, W - 80), fill=(200, 218, 240))
     les = datos.get("lesionados", [])
     if not les:
-        center(d, 760, "Sen baixas", font(84))
-        center(d, 880, "por lesión", font(84))
-        center(d, 1010, "no parte médico", font(40), fill=AZUL)
-    y0, ph = 372, 168
+        center(d, 800, "Sen baixas", font(84))
+        center(d, 920, "por lesión", font(84))
+        center(d, 1050, "no parte médico", font(40), fill=AZUL)
+    y0, ph = 506, 168
     for i, x in enumerate(les):
         y = y0 + i * ph
         cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        ImageDraw.Draw(cap).rounded_rectangle([40, y, W - 40, y + ph - 10], 14, fill=(255, 255, 255, 30))
+        cd = ImageDraw.Draw(cap)
+        cd.rounded_rectangle([40, y, W - 40, y + ph - 10], 14, fill=(255, 255, 255, 30))
+        cd.rounded_rectangle([40, y, 50, y + ph - 10], 5, fill=AZUL + (255,))        # barra de acento a la izquierda
         img.paste(cap, (0, 0), cap)
         d = ImageDraw.Draw(img)
-        cx, cy = 100, y + (ph - 10) // 2          # cruz médica en un círculo blanco
+        cx, cy = 108, y + (ph - 10) // 2          # cruz médica en un círculo blanco
         d.ellipse([cx - 36, cy - 36, cx + 36, cy + 36], fill=WHITE)
         d.rectangle([cx - 8, cy - 24, cx + 8, cy + 24], fill=(208, 40, 52))
         d.rectangle([cx - 24, cy - 8, cx + 24, cy + 8], fill=(208, 40, 52))
-        d.text((170, y + 8), x["nombre"], font=fit(d, x["nombre"], 38, 600), fill=WHITE)
+        d.text((175, y + 8), x["nombre"], font=fit(d, x["nombre"], 38, 600), fill=WHITE)
         fd = font_m(27)
         yy = y + 58
         for l in _lineas(d, x.get("diagnostico", ""), fd, 640):
-            d.text((170, yy), l, font=fd, fill=(214, 228, 246))
+            d.text((175, yy), l, font=fd, fill=(214, 228, 246))
             yy += 31
         if x.get("observaciones") and yy + 28 < y + ph - 10:
-            d.text((170, yy + 2), x["observaciones"], font=fit(d, x["observaciones"], 22, 640, 18), fill=AZUL)
-        center(d, y + 32, "DENDE", font(22), fill=AZUL, x=915)
-        center(d, y + 62, _fecha_corta(x.get("fecha")), font(30), fill=WHITE, x=915)
+            d.text((175, yy + 2), x["observaciones"], font=fit(d, x["observaciones"], 22, 640, 18), fill=AZUL)
+        center(d, y + 26, "DENDE", font(22), fill=AZUL, x=915)
+        center(d, y + 54, _fecha_corta(x.get("fecha")), font(30), fill=WHITE, x=915)
+        baixa = _dias_baixa(x.get("fecha"), datos.get("hoy") or "")
+        if baixa:
+            center(d, y + 100, baixa, font_m(24), fill=(200, 218, 240), x=915)
     pie(img, d)
     return img
-
 
 
 # ---------------------------------------------------------------- entradas a la venta
@@ -413,42 +441,44 @@ def entradas(datos):
     img = fondo(); d = ImageDraw.Draw(img)
     titulo = "ENTRADAS VISITANTES" if datos.get("visitantes") else "ENTRADAS"
     cabecera(img, d, datos.get("tag", ""), titulo, None, ytitulo=205)
-    cy = 575
+    logo = datos.get("logo")
+    if logo in LOGOS and os.path.exists(os.path.join(ASSETS, "marca", LOGOS[logo])):
+        pegar(img, os.path.join(ASSETS, "marca", LOGOS[logo]), 445, 322, (190, 190))
+    cy = 705
     if datos.get("local_nombre") and datos.get("visitante_nombre"):
         escudo(img, 215, cy, datos.get("local"), siglas(datos["local_nombre"]))
         escudo(img, 865, cy, datos.get("visitante"), siglas(datos["visitante_nombre"]))
         center(d, cy - 43, "VS", font(80), fill=AZUL)
         nombres_bajo_escudos(d, datos, y=cy + 190)
-        y = cy + 190 + 56 * 2 + 40
     else:
         for l in _lineas(d, datos.get("partido") or datos.get("titulo", ""), font(60), W - 120, 3):
-            center(d, 430, l, font(60))
-        y = cy + 190 + 56 * 2 + 40
-    sub = " · ".join(x for x in (datos.get("torneo"), f"Xornada {datos['jornada']}" if datos.get("jornada") else None) if x)
+            center(d, 600, l, font(60))
+    y = cy + 190 + 56 * 2 + 14
+    sub = f"Xornada {datos['jornada']}" if datos.get("jornada") else (datos.get("torneo") if not logo else None)
     if sub:
-        center(d, y, sub, fit(d, sub, 36, W - 100, 24), fill=(200, 218, 240)); y += 56
+        center(d, y, sub, fit(d, sub, 36, W - 100, 24), fill=(200, 218, 240)); y += 52
     ph = datos.get("partido_fecha_hora")
     if ph:
         dt = datetime.datetime.fromisoformat(ph)
         dias = ["luns", "martes", "mércores", "xoves", "venres", "sábado", "domingo"]
         cad = f"{dias[dt.weekday()].capitalize()} {dt.day:02d}/{dt.month:02d} · {dt:%H:%M} h"
-        center(d, y, cad, fit(d, cad, 52, W - 100, 30), fill=AZUL); y += 84
-    y = max(y + 14, 1050)
-    fd = font_m(32)
+        center(d, y, cad, fit(d, cad, 52, W - 100, 30), fill=AZUL); y += 80
+    y = max(y + 10, 1150)
+    fd = font_m(31)
     for i, texto in enumerate(datos.get("puntos", [])[:3], 1):
         cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        ImageDraw.Draw(cap).rounded_rectangle([40, y, W - 40, y + 130], 14, fill=(255, 255, 255, 30))
+        ImageDraw.Draw(cap).rounded_rectangle([40, y, W - 40, y + 118], 14, fill=(255, 255, 255, 30))
         img.paste(cap, (0, 0), cap)
         d = ImageDraw.Draw(img)
-        cx, cyp = 100, y + 65
-        d.ellipse([cx - 32, cyp - 32, cx + 32, cyp + 32], fill=AZUL)
-        center(d, cyp - 27, str(i), font(40), fill=(10, 35, 57), x=cx)
-        lineas = _lineas(d, texto, fd, 820, 3)
-        yy = cyp - (len(lineas) * 40) // 2
+        cx, cyp = 98, y + 59
+        d.ellipse([cx - 30, cyp - 30, cx + 30, cyp + 30], fill=AZUL)
+        center(d, cyp - 25, str(i), font(38), fill=(10, 35, 57), x=cx)
+        lineas = _lineas(d, texto, fd, 830, 2)
+        yy = cyp - (len(lineas) * 38) // 2
         for l in lineas:
-            d.text((160, yy), l, font=fd, fill=WHITE)
-            yy += 40
-        y += 148
+            d.text((155, yy), l, font=fd, fill=WHITE)
+            yy += 38
+        y += 134
     pie(img, d)
     return img
 
@@ -476,7 +506,7 @@ def cumpleanos(datos):
     if datos.get("posicion"):
         center(d, y + 10, datos["posicion"], fit(d, datos["posicion"], 46, W - 120, 28), fill=AZUL); y += 80
     if datos.get("fecha"):
-        center(d, y + 30, f"Hoxe, {datos['fecha']}", font(46), fill=(200, 218, 240)); y += 90
+        center(d, y + 30, f"{datos['fecha']}", font(50), fill=(200, 218, 240)); y += 90
     center(d, max(y + 60, 1380), "Parabéns da Marexada Celeste!", fit(d, "Parabéns da Marexada Celeste!", 52, W - 100, 30))
     pie(img, d)
     return img

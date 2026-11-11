@@ -4,7 +4,7 @@ Lee las páginas del parte médico del club (cada lesionado con su diagnóstico,
     primer equipo  https://rccelta.es/equipos/primer-equipo/parte-medico/
     Celta Fortuna  https://rccelta.es/equipos/celta-fortuna/parte-medico/
 y escribe en la carpeta de salida:
-    partemedico_celta.json, partemedico_celta_2.json ...      (7 lesionados por imagen; si hay más, otra imagen)
+    partemedico_celta.json, partemedico_celta_2.json ...      (6 lesionados por imagen; si hay más, otra imagen)
     partemedico_fortuna.json, partemedico_fortuna_2.json ...
 Cada JSON lleva una "firma": cambia cuando entra o sale alguien del parte o cambia un diagnóstico.
 El programa diario la usa para sacar la historia solo cuando el parte cambia.
@@ -15,6 +15,7 @@ Uso:
 Si la página cambia y no se entiende, guarda lo recibido en partemedico_*_DEBUG.html para poder ajustarlo.
 """
 import argparse
+import datetime
 import hashlib
 import json
 import os
@@ -32,7 +33,7 @@ EQUIPOS = {
                                                    "https://rccelta.es/gl/equipos/celta-fortuna/parte-medico/",
                                                    "https://rccelta.es/en/equipos/celta-fortuna/parte-medico/"]},
 }
-POR_IMAGEN = 7
+POR_IMAGEN = 6
 SALTAR = {"script", "style", "noscript"}      # (svg/button no: hay svg sin cerrar y el contador se atascaba)
 ETIQUETAS = (("diagnostico", re.compile(r"^(diagn[oó]stic[oa]?|diagnosis)\W*$", re.I)), ("lugar", re.compile(r"^(lugar|place|location)\W*$", re.I)),
              ("tratamiento", re.compile(r"^(tratamiento|tratamento|treatment)\W*$", re.I)),
@@ -150,6 +151,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--desde", default=None, help="carpeta con copias HTML (prueba sin internet)")
     ap.add_argument("--salida", default=os.path.join(BASE, "datos_reales"))
+    ap.add_argument("--hoy", default=datetime.date.today().isoformat())
     a = ap.parse_args()
     os.makedirs(a.salida, exist_ok=True)
     fallos, hechos = [], 0
@@ -181,7 +183,7 @@ def main():
                 os.remove(os.path.join(a.salida, viejo))
         for n, trozo in enumerate(trozos, 1):
             datos = {"tipo": "partemedico", "competicion": "liga", "tag": cfg["tag"], "equipo": equipo, "actualizado": actualizado,
-                     "pagina": f"{n}/{len(trozos)}" if len(trozos) > 1 else None, "n_total": len(lesionados), "firma": f, "lesionados": trozo}
+                     "pagina": f"{n}/{len(trozos)}" if len(trozos) > 1 else None, "n_total": len(lesionados), "firma": f, "hoy": a.hoy, "lesionados": trozo}
             nombre = f"partemedico_{equipo}.json" if n == 1 else f"partemedico_{equipo}_{n}.json"
             with open(os.path.join(a.salida, nombre), "w", encoding="utf-8") as fh:
                 json.dump(datos, fh, ensure_ascii=False, indent=1)

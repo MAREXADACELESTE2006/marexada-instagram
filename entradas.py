@@ -209,6 +209,40 @@ def _corta(t, n):
     return t[:n].rsplit(" ", 1)[0].rstrip(",;:") + "…"
 
 
+RELATIVO = re.compile(r"\b(hoy|ma[ñn]ana|ayer|ahora mismo|[uú]ltimas? horas?|pr[oó]ximas? horas|esta (?:tarde|noche|semana|ma[ñn]ana)|este fin de semana|en breve|de forma inmediata|ya est[aá])\b", re.I)
+DIA_GL_LISTA = ["luns", "martes", "mércores", "xoves", "venres", "sábado", "domingo"]
+
+
+def _fecha_gl(f):
+    return f"{DIA_GL_LISTA[f.weekday()]} {f.day}/{f.month:02d}"
+
+
+def absolutiza(frase, publicada):
+    """Convierte «desde hoy», «mañana»... en la fecha real de la noticia. Si quedan expresiones relativas que no se pueden
+    convertir (p. ej. «en las últimas horas»), devuelve None y la frase no se usa."""
+    if not publicada:
+        return None if RELATIVO.search(frase) else frase
+    pub = publicada
+    reglas = [(r"\bdesde hoy\b", f"desde el {_fecha_gl(pub)}"), (r"\bhasta hoy\b", f"hasta el {_fecha_gl(pub)}"), (r"\bhoy\b", f"el {_fecha_gl(pub)}"),
+              (r"\bpasado ma[ñn]ana\b", f"el {_fecha_gl(pub + datetime.timedelta(days=2))}"),
+              (r"\bma[ñn]ana\b", f"el {_fecha_gl(pub + datetime.timedelta(days=1))}"), (r"\bayer\b", f"el {_fecha_gl(pub - datetime.timedelta(days=1))}")]
+    for rx, rep in reglas:
+        frase = re.sub(rx, rep, frase, flags=re.I)
+    return None if RELATIVO.search(frase) else frase
+
+
+def _competicion(titulo, intro, fortuna):
+    """(logo, competicion) a partir del título y de las primeras frases de la noticia."""
+    t = titulo + " " + intro
+    if re.search(r"europa league|uefa", t, re.I):
+        return "europa", "europa"
+    if re.search(r"copa del rey", t, re.I):
+        return "copa", "liga"
+    if re.search(r"hypermotion", t, re.I) or fortuna:
+        return "hypermotion", "liga"
+    return "laliga", "liga"
+
+
 def _lado(nombre_equipo):
     """(nombre para mostrar, escudo) de un lado del partido. El Celta y el Celta Fortuna llevan el escudo del Celta."""
     n = _limpia(nombre_equipo)
@@ -244,10 +278,17 @@ def articulo(html, nombre, hoy):
     texto = _limpia(" ".join(parrafos))
     frases = [f.strip() for f in re.split(r"(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚ¡¿0-9])", texto) if len(f.strip()) > 25]
     partido_dt, anio = None, (fecha or hoy).year
-    for f in frases[:6]:
-        m = FECHA_HORA.search(f)
-        if m and re.search(r"disput|partido|encuentro|jornada|cita", f, re.I) and m.group(3).lower() in MESES:
-            partido_dt = datetime.datetime(anio, MESES[m.group(3).lower()], int(m.group(2)), int(m.group(4)), int(m.group(5)))
+    for estricto in (True, False):                               # 1º frases que hablan del partido; 2º cualquier fecha que no sea de venta
+        for f in frases[:8]:
+            m = FECHA_HORA.search(f)
+            if not m or m.group(3).lower() not in MESES:
+                continue
+            habla_partido = re.search(r"disput|partido|encuentro|jornada|cita|choque|duelo", f, re.I)
+            es_venta = re.search(r"venta|canje|prioridad|adquirir|desde el|hasta el", f, re.I)
+            if (estricto and habla_partido) or (not estricto and not es_venta):
+                partido_dt = datetime.datetime(anio, MESES[m.group(3).lower()], int(m.group(2)), int(m.group(4)), int(m.group(5)))
+                break
+        if partido_dt:
             break
     jornada = re.search(r"Jornada\s+(\d{1,2})", texto, re.I)
     competicion = re.search(r"(LaLiga Hypermotion|LaLiga EA Sports|LaLiga|Europa League|Conference League|Copa del Rey|UEFA[^.,;]{0,25})", texto, re.I)
@@ -267,8 +308,11 @@ def articulo(html, nombre, hoy):
         puntos.append(f"Canxe de entradas ata o {_cuando(canje)}")
     if len(puntos) < 2:
         for f in frases[1:]:
-            if CLAVES.search(f) and len(puntos) < 3 and _corta(f, 150) not in puntos:
-                puntos.append(_corta(f, 150))
+            if not (CLAVES.search(f) and re.search(r"\d", f)):            # solo frases con datos concretos (fechas, horas, precios)
+                continue
+            f2 = absolutiza(f, fecha)
+            if f2 and len(puntos) < 3 and _corta(f2, 150) not in puntos:
+                puntos.append(_corta(f2, 150))
     if not (partido or puntos):
         return None
     lado = {}
@@ -279,11 +323,13 @@ def articulo(html, nombre, hoy):
             lado = {"local": ls, "visitante": vs, "local_nombre": ln, "visitante_nombre": vn}
             fuera = bool(re.search(r"celta", vn, re.I)) and not re.search(r"celta", ln, re.I)
             lado["visitantes"] = fuera or bool(re.search(r"visitante|desplazamiento", nombre + " " + titulo, re.I))
-    return {"tipo": "entradas", "competicion": "liga", **lado, "tag": "CELTA FORTUNA" if re.search(r"fortuna", nombre + titulo, re.I) else "REAL CLUB CELTA",
+    logo, comp = _competicion(titulo, " ".join(frases[:3]), bool(re.search(r"fortuna", nombre + titulo, re.I)))
+    return {"tipo": "entradas", "competicion": comp, "logo": logo, **lado, "tag": "CELTA FORTUNA" if re.search(r"fortuna", nombre + titulo, re.I) else "REAL CLUB CELTA",
             "nombre": nombre, "url": f"{RAIZ}/club/actualidad/{nombre}/", "titulo": titulo, "partido": partido, "publicada": fecha.isoformat() if fecha else None,
             "partido_fecha_hora": partido_dt.strftime("%Y-%m-%dT%H:%M") if partido_dt else None,
             "jornada": int(jornada.group(1)) if jornada else None, "torneo": competicion.group(1) if competicion else None,
-            "intro": _corta(frases[0], 220) if frases else "", "puntos": puntos[:3]}
+            "intro": _corta(frases[0], 220) if frases else "", "puntos": puntos[:3],
+            "modificada": _meta(html, "article:modified_time"), "verificada": datetime.datetime.now().isoformat(timespec="minutes")}
 
 
 def main():
@@ -291,7 +337,7 @@ def main():
     ap.add_argument("--hoy", default=datetime.date.today().isoformat())
     ap.add_argument("--desde", default=None, help="carpeta con copias HTML (prueba sin internet)")
     ap.add_argument("--salida", default=os.path.join(BASE, "datos_reales"))
-    ap.add_argument("--dias", type=int, default=8, help="solo noticias de los últimos N días")
+    ap.add_argument("--dias", type=int, default=2, help="solo noticias publicadas en los últimos N días")
     ap.add_argument("--max", type=int, default=3, help="como mucho N noticias")
     a = ap.parse_args()
     hoy = datetime.date.fromisoformat(a.hoy)
@@ -300,7 +346,7 @@ def main():
     lista, respondieron = descubrir(a.desde, traza)
     candidatas = [(n, u) for n, u in lista if ENTRADA.search(n) and not EXCLUIR.search(n)]
     traza.append(f"candidatas por el nombre: {len(candidatas)} de {len(lista)} enlaces")
-    leidas, noticias, revisadas = set(), [], 0
+    leidas, noticias, revisadas, control = set(), [], 0, []
     cola = candidatas[:10]
     while cola and revisadas < 20:
         nombre, url = cola.pop(0)
@@ -320,15 +366,31 @@ def main():
         d = articulo(html, nombre, hoy)
         if not d:
             continue
+        c = {"noticia": nombre, "publicada": d["publicada"], "partido": d["partido"], "evento": (d["partido_fecha_hora"] or "")[:10] or None}
         if d["publicada"] and (hoy - datetime.date.fromisoformat(d["publicada"])).days > a.dias:
+            control.append({**c, "decision": "DESCARTADA", "motivo": f"noticia de hace {(hoy - datetime.date.fromisoformat(d['publicada'])).days} días (solo se avisa de las de los últimos {a.dias})"})
             continue
         if d["partido_fecha_hora"] and datetime.datetime.fromisoformat(d["partido_fecha_hora"]).date() < hoy:
-            continue                                          # el partido ya se jugó
-        noticias.append(d)
+            control.append({**c, "decision": "DESCARTADA", "motivo": "el partido ya se jugó"})
+            continue
+        # estado actual: se vuelve a consultar la fuente oficial justo antes de generar la imagen
+        try:
+            d2 = articulo(descargar(url, a.desde), nombre, hoy)
+        except Exception as e:
+            control.append({**c, "decision": "DESCARTADA", "motivo": f"no pude volver a consultar la noticia ({e})"})
+            continue
+        if not d2:
+            control.append({**c, "decision": "DESCARTADA", "motivo": "en la segunda consulta la noticia ya no es de entradas"})
+            continue
+        d2["verificada"] = datetime.datetime.now().isoformat(timespec="minutes")
+        noticias.append(d2)
+        control.append({**c, "decision": "OK", "motivo": "verificada otra vez en la fuente oficial", "verificada": d2["verificada"]})
     if not respondieron and not noticias:
         with open(os.path.join(a.salida, "entradas_DEBUG.txt"), "w", encoding="utf-8") as f:
             f.write("\n".join(traza) + "\n")
         sys.exit("ERROR entradas: no consigo la lista de noticias del club (" + "; ".join(traza[-4:]) + ")")
+    with open(os.path.join(a.salida, "control_entradas.json"), "w", encoding="utf-8") as fh:
+        json.dump(control, fh, ensure_ascii=False, indent=1)
     noticias.sort(key=lambda d: d["publicada"] or "", reverse=True)
     for viejo in os.listdir(a.salida):
         if re.fullmatch(r"entradas_.+\.json", viejo):

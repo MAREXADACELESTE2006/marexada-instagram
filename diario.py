@@ -91,6 +91,50 @@ def etiquetas(nombre):
 
 
 # ---------------------------------------------------------------- qué toca hoy
+
+# ---------------------------------------------------------------- control de actualidad (obligatorio antes de generar una imagen)
+MAX_DIAS_NOTICIA = 2
+CONTROLADOS = {"entradas", "partemedico", "cumpleanos"}                 # historias basadas en noticias o datos que pueden quedarse viejos
+RELATIVOS = re.compile(r"\b(hoy|hoxe|ma[ñn][aá]n?a|ma[ñn]á|ayer|onte|ahora mismo|[uú]ltimas? horas?|esta (?:tarde|noche|semana)|este fin de semana|"
+                       r"en breve|dende hoxe|desde hoy)\b", re.I)
+
+
+def control_actualidad(h, jd, datos, hoy):
+    """Comprueba antes de generar la imagen: 1) fecha de la noticia, 2) fecha del acontecimiento (partido), 3) que se haya vuelto a
+    consultar la fuente oficial en esta misma ejecución, 4) que el texto no use «hoy», «mañana»... sin corresponder.
+    Devuelve (ok, resumen_para_el_control)."""
+    pub = jd.get("publicada")
+    evento = (jd.get("partido_fecha_hora") or "")[:10] or None
+    info = (f"noticia {pub[8:10] + '/' + pub[5:7] if pub else '—'} · partido {evento[8:10] + '/' + evento[5:7] if evento else '—'}"
+            if (pub or evento) else "dato de estado (sin fecha de noticia)")
+    if pub and (hoy - datetime.date.fromisoformat(pub)).days > MAX_DIAS_NOTICIA:
+        return False, f"{info} → DESCARTADA: noticia de hace {(hoy - datetime.date.fromisoformat(pub)).days} días"
+    if jd.get("tipo") == "entradas":
+        if not evento:                                           # sin fecha en la noticia: se contrasta con el calendario oficial
+            rival = {jd.get("local"), jd.get("visitante")} - {"celta-vigo", None}
+            for f in ("proximo_celta.json", "proximo_fortuna.json"):
+                p = datos.get(f)
+                if p and rival and rival & {p.get("local"), p.get("visitante")}:
+                    evento = p.get("_fecha")
+                    jd["partido_fecha_hora"] = jd.get("partido_fecha_hora") or None
+        if not evento:
+            return False, f"{info} → DESCARTADA: no puedo confirmar la fecha del partido"
+        if datetime.date.fromisoformat(evento) < hoy:
+            return False, f"{info} → DESCARTADA: el partido ya se jugó ({evento})"
+        try:                                                     # (la ejecución corre en hora UTC y «hoy» es la fecha de Madrid: se admite 1 día)
+            ok_ver = abs((hoy - datetime.date.fromisoformat((jd.get("verificada") or "")[:10])).days) <= 1
+        except ValueError:
+            ok_ver = False
+        if not ok_ver:
+            return False, f"{info} → DESCARTADA: la fuente oficial no se ha vuelto a consultar hoy"
+    textos = [h["texto"]] + [str(x) for x in jd.get("puntos", [])] + [jd.get("intro", "")]
+    for t in textos:
+        m = RELATIVOS.search(t or "")
+        if m and not (pub == hoy.isoformat()):
+            return False, f"{info} → DESCARTADA: lenguaje temporal sin fecha real («{m.group(0)}»)"
+    return True, f"{info} → OK" + (f" (verificada {jd['verificada'][11:16]})" if jd.get("verificada") else "")
+
+
 def plan(hoy, datos, avisos):
     """Devuelve una lista de historias: clave (para no repetir), fichero de datos, momento, hora sugerida y texto."""
     wd = hoy.weekday()
@@ -173,9 +217,9 @@ def plan(hoy, datos, avisos):
             continue
         partido = en.get("partido") or "o próximo partido"
         primero = (" " + en["puntos"][0] + ".") if en.get("puntos") else ""
-        que = "entradas para os afeccionados visitantes" if en.get("visitantes") else "entradas"
+        que = "Entradas para afeccionados visitantes" if en.get("visitantes") else "Entradas dispoñibles"
         add(f"entradas-{en['nombre']}", fichero, "mañana", "canto antes (para avisar aos peñistas)",
-            f"🎟️ Xa hai {que} para o {partido}!{primero} Todos os detalles: {en.get('url', 'rccelta.es')} {etiquetas('celta')}")
+            f"🎟️ {que}: {partido}.{primero} Todos os detalles: {en.get('url', 'rccelta.es')} {etiquetas('celta')}")
 
     # Cumpleaños: una historia por cada jugador o miembro del cuerpo técnico que cumple años hoy (datos en cumpleanos.json).
     for fichero in sorted(f for f in datos if re.fullmatch(r"cumpleanos_.+\.json", f)):
@@ -184,7 +228,7 @@ def plan(hoy, datos, avisos):
             continue
         quien = f"o noso adestrador {c['nombre']}" if "adestrador" in (c.get("posicion") or "").lower() else c["nombre"]
         add(f"cumple-{fichero[10:-5]}-{c.get('año', hoy.year)}", fichero, "mañana", "09:00",
-            f"🎂 Hoxe cumpre {c['edad']} anos {quien}! Moitas felicidades e que cumpra moitos máis co celeste no peito 💙 {etiquetas(c.get('equipo', 'celta'))}")
+            f"🎂 O {c['fecha']} cumpre {c['edad']} anos {quien}! Moitas felicidades e que cumpra moitos máis co celeste no peito 💙 {etiquetas(c.get('equipo', 'celta'))}")
     return out
 
 
@@ -243,7 +287,7 @@ def main():
             ("resultados.py", ["--desde", fx("espn_resultados_EJEMPLO.json"), "--ahora", f"{hoy.isoformat()}T06:00:00", "--salida", d_datos], "Resultados Celta/Fortuna"),
             ("besoccer.py", ["--clasif", fx("besoccer_clasificacion_RECONSTRUIDO.html"), "--partidos", fx("besoccer_partidos_RECONSTRUIDO.html"),
                              "--hoy", hoy.isoformat(), "--salida", d_datos], "AS Celtas Fem (besoccer)"),
-            ("partemedico.py", ["--desde", fx("partemedico_REAL"), "--salida", d_datos], "Parte médico (rccelta.es)"),
+            ("partemedico.py", ["--hoy", hoy.isoformat(), "--desde", fx("partemedico_REAL"), "--salida", d_datos], "Parte médico (rccelta.es)"),
             ("entradas.py", ["--hoy", hoy.isoformat(), "--desde", fx("entradas_RECONSTRUIDO"), "--salida", d_datos], "Entradas (rccelta.es)"),
             ("cumpleanos.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Cumpleaños"),
         ]
@@ -255,7 +299,7 @@ def main():
             ("noticias.py", ["--salida", d_datos], "Noticias rccelta.es"),
             ("resultados.py", ["--ahora", ahora, "--salida", d_datos], "Resultados Celta/Fortuna"),
             ("futbolme.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "AS Celtas Fem (futbolme)"),
-            ("partemedico.py", ["--salida", d_datos], "Parte médico (rccelta.es)"),
+            ("partemedico.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Parte médico (rccelta.es)"),
             ("entradas.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Entradas (rccelta.es)"),
             ("cumpleanos.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Cumpleaños"),
         ]
@@ -264,10 +308,20 @@ def main():
     datos = {f: cargar(os.path.join(d_datos, f)) for f in os.listdir(d_datos) if f.endswith(".json")}
     estado = cargar(ESTADO) or {}
     historias = []
+    controles = []
     for h in plan(hoy, datos, avisos):
         if h["clave"] in estado and not a.forzar:
             continue
+        jd = datos.get(h["fichero"]) or {}
+        if jd.get("tipo") in CONTROLADOS:
+            ok_c, msg = control_actualidad(h, jd, datos, hoy)
+            controles.append(f"{h['clave']}: {msg}")
+            if not ok_c:
+                continue
         historias.append(h)
+    for c in (datos.get("control_entradas.json") or []):              # noticias de entradas que ya descartó el lector
+        if c.get("decision") == "DESCARTADA":
+            controles.append(f"{c['noticia']}: noticia {(c['publicada'] or '—')[8:10]}/{(c['publicada'] or '—')[5:7]} → DESCARTADA: {c['motivo']}")
 
     import generar
     for i, h in enumerate(historias, 1):
@@ -289,6 +343,8 @@ def main():
         L.append("Hoy no hay historias automáticas nuevas.")
     L += ["", "## Contido propio que toca hoxe (aínda sen automatizar)"] + [f"- {r}" for r in RECORDATORIOS[hoy.weekday()]]
     L += ["- Aliñación do Celta e do Fortuna: non se xera (non fai falta)."]
+    if controles:
+        L += ["", "## Control de actualidad"] + [f"- {x}" for x in controles]
     if avisos:
         L += ["", "## Avisos"] + [f"- {x}" for x in avisos]
     resumen = "\n".join(L) + "\n"

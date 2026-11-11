@@ -166,6 +166,15 @@ def plan(hoy, datos, avisos):
             else:
                 txt = f"Parte médico {quien}: sen baixas por lesión! 💙 {etiquetas(nombre)}"
             add(f"partemedico-{nombre}-{pm['firma']}-{pag.split('/')[0]}", fichero, "tarde", "cando o publique o club (ou a tarde)", txt)
+    # Entradas: una historia por cada noticia nueva de entradas del Celta o del Celta Fortuna en rccelta.es.
+    for fichero in sorted(f for f in datos if re.fullmatch(r"entradas_.+\.json", f)):
+        en = datos[fichero]
+        if not en or not en.get("nombre"):
+            continue
+        partido = en.get("partido") or "o próximo partido"
+        primero = (" " + en["puntos"][0] + ".") if en.get("puntos") else ""
+        add(f"entradas-{en['nombre']}", fichero, "mañana", "canto antes (para avisar aos peñistas)",
+            f"🎟️ Xa hai entradas para o {partido}!{primero} Todos os detalles: {en.get('url', 'rccelta.es')} {etiquetas('celta')}")
     return out
 
 
@@ -224,7 +233,8 @@ def main():
             ("resultados.py", ["--desde", fx("espn_resultados_EJEMPLO.json"), "--ahora", f"{hoy.isoformat()}T06:00:00", "--salida", d_datos], "Resultados Celta/Fortuna"),
             ("besoccer.py", ["--clasif", fx("besoccer_clasificacion_RECONSTRUIDO.html"), "--partidos", fx("besoccer_partidos_RECONSTRUIDO.html"),
                              "--hoy", hoy.isoformat(), "--salida", d_datos], "AS Celtas Fem (besoccer)"),
-            ("partemedico.py", ["--desde", fx("partemedico_RECONSTRUIDO"), "--salida", d_datos], "Parte médico (rccelta.es)"),
+            ("partemedico.py", ["--desde", fx("partemedico_REAL"), "--salida", d_datos], "Parte médico (rccelta.es)"),
+            ("entradas.py", ["--hoy", hoy.isoformat(), "--desde", fx("entradas_RECONSTRUIDO"), "--salida", d_datos], "Entradas (rccelta.es)"),
         ]
     else:
         ahora = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
@@ -235,6 +245,7 @@ def main():
             ("resultados.py", ["--ahora", ahora, "--salida", d_datos], "Resultados Celta/Fortuna"),
             ("futbolme.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "AS Celtas Fem (futbolme)"),
             ("partemedico.py", ["--salida", d_datos], "Parte médico (rccelta.es)"),
+            ("entradas.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Entradas (rccelta.es)"),
         ]
     ok = [correr(s, args, etq, avisos) for s, args, etq in fuentes]
 

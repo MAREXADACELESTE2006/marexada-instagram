@@ -3,6 +3,7 @@
 Tipos: proximo | resultado | convocatoria | alineacion.  Europa League sigue con el diseño de generar.py.
 Se usa desde generar.py (generar_historia.RENDER).  Fondo: assets/fondos/historia.jpg (si no existe, el provisional).
 """
+import datetime
 import glob
 import json
 import os
@@ -407,6 +408,54 @@ def partemedico(datos):
 
 
 
+# ---------------------------------------------------------------- entradas a la venta
+def entradas(datos):
+    img = fondo(); d = ImageDraw.Draw(img)
+    center(d, 110, datos.get("tag", ""), font(44), fill=AZUL)
+    center(d, 165, "ENTRADAS", fit(d, "ENTRADAS", 110, W - 100))
+    partido = datos.get("partido") or datos.get("titulo", "")
+    partes = re.split(r"\s+[-–—]\s+", partido, maxsplit=1)
+    y = 330
+    if len(partes) == 2:
+        center(d, y, partes[0], fit(d, partes[0], 72, W - 100, 40))
+        center(d, y + 92, "VS", font(34), fill=AZUL)
+        center(d, y + 142, partes[1], fit(d, partes[1], 72, W - 100, 40))
+        y += 270
+    else:
+        for l in _lineas(d, partido, font(60), W - 120, 3):
+            center(d, y, l, font(60)); y += 76
+        y += 30
+    sub = " · ".join(x for x in (datos.get("torneo"), f"Xornada {datos['jornada']}" if datos.get("jornada") else None) if x)
+    if sub:
+        center(d, y, sub, fit(d, sub, 36, W - 100, 24), fill=AZUL); y += 64
+    ph = datos.get("partido_fecha_hora")
+    if ph:
+        dt = datetime.datetime.fromisoformat(ph)
+        dias = ["luns", "martes", "mércores", "xoves", "venres", "sábado", "domingo"]
+        cad = f"{dias[dt.weekday()].capitalize()} {dt.day:02d}/{dt.month:02d} · {dt:%H:%M} h"
+        center(d, y, cad, fit(d, cad, 50, W - 100, 30)); y += 90
+    y = max(y + 30, 800)
+    fd = font_m(34)
+    for i, texto in enumerate(datos.get("puntos", [])[:3], 1):
+        cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        ImageDraw.Draw(cap).rounded_rectangle([40, y, W - 40, y + 150], 14, fill=(255, 255, 255, 30))
+        img.paste(cap, (0, 0), cap)
+        d = ImageDraw.Draw(img)
+        cx, cy = 105, y + 75
+        d.ellipse([cx - 36, cy - 36, cx + 36, cy + 36], fill=AZUL)
+        center(d, cy - 30, str(i), font(44), fill=(10, 35, 57), x=cx)
+        lineas = _lineas(d, texto, fd, 800, 3)
+        yy = cy - (len(lineas) * 44) // 2
+        for l in lineas:
+            d.text((170, yy), l, font=fd, fill=WHITE)
+            yy += 44
+        y += 172
+    center(d, y + 40, "Máis información en rccelta.es", font(34), fill=AZUL)
+    pie(img, d)
+    return img
+
+
+
 # ---------------------------------------------------------------- previa en la sede
 def _jarra():
     """Jarra de cerveza con asa a la derecha (cristal grueso, cerveza ámbar y espuma), dibujada al doble de tamaño."""
@@ -511,4 +560,4 @@ def previa(datos):
     return img
 
 
-RENDER = {"partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}
+RENDER = {"entradas": entradas, "partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}

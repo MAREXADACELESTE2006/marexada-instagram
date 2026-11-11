@@ -11,6 +11,18 @@
   "nombre": "AFC Bournemouth",
   "corto": "AFC BOURNEMOUTH"
  },
+ "albacete-balompie": {
+  "nombre": "Albacete Balompié",
+  "corto": "ALBACETE BALOMPIÉ"
+ },
+ "athletic-club-bilbao": {
+  "nombre": "Athletic Club Bilbao",
+  "corto": "ATHLETIC"
+ },
+ "atletico-madrid": {
+  "nombre": "Atletico Madrid",
+  "corto": "ATLÉTICO"
+ },
  "az-alkmaar": {
   "nombre": "AZ Alkmaar",
   "corto": "AZ ALKMAAR"
@@ -23,6 +35,34 @@
   "nombre": "Beşiktaş",
   "corto": "BESIKTAS"
  },
+ "burgos-cf": {
+  "nombre": "Burgos CF",
+  "corto": "BURGOS CF"
+ },
+ "cadiz-cf": {
+  "nombre": "Cadiz CF",
+  "corto": "CÁDIZ"
+ },
+ "cd-castellon": {
+  "nombre": "CD Castellón",
+  "corto": "CD CASTELLÓN"
+ },
+ "cd-eldense": {
+  "nombre": "CD Eldense",
+  "corto": "CD ELDENSE"
+ },
+ "cd-leganes": {
+  "nombre": "CD Leganés",
+  "corto": "LEGANÉS"
+ },
+ "cd-tenerife": {
+  "nombre": "CD Tenerife",
+  "corto": "CD TENERIFE"
+ },
+ "ce-sabadell": {
+  "nombre": "CE Sabadell",
+  "corto": "CE SABADELL"
+ },
  "celta-vigo": {
   "nombre": "Celta Vigo",
   "corto": "CELTA"
@@ -31,21 +71,61 @@
   "nombre": "Celtic",
   "corto": "CELTIC"
  },
+ "ceuta": {
+  "nombre": "AD Ceuta FC",
+  "corto": "AD CEUTA FC"
+ },
+ "cordoba": {
+  "nombre": "Córdoba",
+  "corto": "CÓRDOBA"
+ },
  "crystal-palace": {
   "nombre": "Crystal Palace",
   "corto": "CRYSTAL PALACE"
+ },
+ "deportivo-alaves": {
+  "nombre": "Deportivo Alaves",
+  "corto": "ALAVÉS"
+ },
+ "deportivo-la-coruna": {
+  "nombre": "Deportivo La Coruña",
+  "corto": "DEPORTIVO"
+ },
+ "elche-cf": {
+  "nombre": "Elche CF",
+  "corto": "ELCHE"
+ },
+ "fc-andorra": {
+  "nombre": "FC Andorra",
+  "corto": "FC ANDORRA"
  },
  "fc-ararat-armenia": {
   "nombre": "FC Ararat-Armenia",
   "corto": "FC ARARAT-ARMENIA"
  },
+ "fc-barcelona": {
+  "nombre": "FC Barcelona",
+  "corto": "BARCELONA"
+ },
  "ferencvaros-tc": {
   "nombre": "Ferencvaros TC",
   "corto": "FERENCVAROS TC"
  },
+ "getafe-cf": {
+  "nombre": "Getafe C.F",
+  "corto": "GETAFE"
+ },
+ "girona-fc": {
+  "nombre": "Girona FC",
+  "corto": "GIRONA"
+ },
  "gnk-dinamo-zagreb": {
   "nombre": "GNK Dinamo Zagreb",
   "corto": "GNK DINAMO ZAGREB"
+ },
+ "granada": {
+  "nombre": "Granada CF",
+  "corto": "GRANADA"
  },
  "hapoel-beer-sheva": {
   "nombre": "Hapoel Beer Sheva",
@@ -59,9 +139,17 @@
   "nombre": "Juventus",
   "corto": "JUVENTUS"
  },
+ "las-palmas": {
+  "nombre": "Las Palmas",
+  "corto": "LAS PALMAS"
+ },
  "lech-poznan": {
   "nombre": "Lech Poznan",
   "corto": "LECH POZNAN"
+ },
+ "levante-ud": {
+  "nombre": "Levante UD",
+  "corto": "LEVANTE"
  },
  "levski-sofia": {
   "nombre": "Levski Sofia",
@@ -70,6 +158,10 @@
  "lillestrom-sk": {
   "nombre": "Lillestrøm SK",
   "corto": "LILLESTRØM SK"
+ },
+ "malaga-cf": {
+  "nombre": "Málaga CF",
+  "corto": "MÁLAGA"
  },
  "nec-nijmegen": {
   "nombre": "NEC Nijmegen",
@@ -95,9 +187,45 @@
   "nombre": "Olympique Lyonnais",
   "corto": "LYON"
  },
+ "osasuna": {
+  "nombre": "Osasuna",
+  "corto": "OSASUNA"
+ },
+ "racing-santander": {
+  "nombre": "Racing Santander",
+  "corto": "RACING"
+ },
+ "rayo-vallecano": {
+  "nombre": "Rayo Vallecano",
+  "corto": "RAYO"
+ },
+ "rcd-espanyol-barcelona": {
+  "nombre": "RCD Espanyol Barcelona",
+  "corto": "ESPANYOL"
+ },
+ "rcd-mallorca": {
+  "nombre": "RCD Mallorca",
+  "corto": "MALLORCA"
+ },
+ "real-betis-balompie": {
+  "nombre": "Real Betis Balompié",
+  "corto": "BETIS"
+ },
+ "real-madrid": {
+  "nombre": "Real Madrid",
+  "corto": "REAL MADRID"
+ },
+ "real-oviedo": {
+  "nombre": "Real Oviedo",
+  "corto": "REAL OVIEDO"
+ },
  "real-sociedad": {
   "nombre": "Real Sociedad",
   "corto": "REAL SOCIEDAD"
+ },
+ "real-valladolid": {
+  "nombre": "Real Valladolid",
+  "corto": "VALLADOLID"
  },
  "red-bull-salzburg": {
   "nombre": "Red Bull Salzburg",
@@ -107,9 +235,21 @@
   "nombre": "RSC Anderlecht",
   "corto": "RSC ANDERLECHT"
  },
+ "salamanca-uds": {
+  "nombre": "Salamanca UDS",
+  "corto": "SALAMANCA"
+ },
  "scu-torreense": {
   "nombre": "S.C.U. Torreense",
   "corto": "S.C.U. TORREENSE"
+ },
+ "sd-eibar": {
+  "nombre": "SD Eibar",
+  "corto": "SD EIBAR"
+ },
+ "sevilla-fc": {
+  "nombre": "Sevilla FC",
+  "corto": "SEVILLA"
  },
  "sk-sturm-graz": {
   "nombre": "SK Sturm Graz",
@@ -123,6 +263,10 @@
   "nombre": "Sparta Praha",
   "corto": "SPARTA PRAHA"
  },
+ "sporting-gijon": {
+  "nombre": "Sporting Gijón",
+  "corto": "SPORTING"
+ },
  "stade-rennais": {
   "nombre": "Stade Rennais",
   "corto": "RENNES"
@@ -135,164 +279,24 @@
   "nombre": "TSG Hoffenheim",
   "corto": "TSG HOFFENHEIM"
  },
- "union-saint-gilloise": {
-  "nombre": "Union Saint-Gilloise",
-  "corto": "UNION SAINT-GILLOISE"
- },
- "viktoria-plzen": {
-  "nombre": "Viktoria Plzeň",
-  "corto": "VIKTORIA PLZEN"
- },
- "albacete-balompie": {
-  "nombre": "Albacete Balompié",
-  "corto": "ALBACETE BALOMPIÉ"
- },
- "burgos-cf": {
-  "nombre": "Burgos CF",
-  "corto": "BURGOS CF"
- },
- "cd-castellon": {
-  "nombre": "CD Castellón",
-  "corto": "CD CASTELLÓN"
- },
- "cd-eldense": {
-  "nombre": "CD Eldense",
-  "corto": "CD ELDENSE"
- },
- "cd-leganes": {
-  "nombre": "CD Leganés",
-  "corto": "LEGANÉS"
- },
- "cd-tenerife": {
-  "nombre": "CD Tenerife",
-  "corto": "CD TENERIFE"
- },
- "fc-andorra": {
-  "nombre": "FC Andorra",
-  "corto": "FC ANDORRA"
- },
- "girona-fc": {
-  "nombre": "Girona FC",
-  "corto": "GIRONA"
- },
- "rcd-mallorca": {
-  "nombre": "RCD Mallorca",
-  "corto": "MALLORCA"
- },
- "real-oviedo": {
-  "nombre": "Real Oviedo",
-  "corto": "REAL OVIEDO"
- },
- "real-valladolid": {
-  "nombre": "Real Valladolid",
-  "corto": "VALLADOLID"
- },
- "sd-eibar": {
-  "nombre": "SD Eibar",
-  "corto": "SD EIBAR"
- },
- "sporting-gijon": {
-  "nombre": "Sporting Gijón",
-  "corto": "SPORTING"
- },
  "ud-almeria": {
   "nombre": "UD Almería",
   "corto": "ALMERÍA"
  },
- "las-palmas": {
-  "nombre": "Las Palmas",
-  "corto": "LAS PALMAS"
- },
- "ceuta": {
-  "nombre": "AD Ceuta FC",
-  "corto": "AD CEUTA FC"
- },
- "cordoba": {
-  "nombre": "Córdoba",
-  "corto": "CÓRDOBA"
- },
- "granada": {
-  "nombre": "Granada CF",
-  "corto": "GRANADA"
- },
- "cadiz-cf": {
-  "nombre": "Cadiz CF",
-  "corto": "CÁDIZ"
- },
- "ce-sabadell": {
-  "nombre": "CE Sabadell",
-  "corto": "CE SABADELL"
- },
- "athletic-club-bilbao": {
-  "nombre": "Athletic Club Bilbao",
-  "corto": "ATHLETIC"
- },
- "atletico-madrid": {
-  "nombre": "Atletico Madrid",
-  "corto": "ATLÉTICO"
- },
- "deportivo-alaves": {
-  "nombre": "Deportivo Alaves",
-  "corto": "ALAVÉS"
- },
- "elche-cf": {
-  "nombre": "Elche CF",
-  "corto": "ELCHE"
- },
- "fc-barcelona": {
-  "nombre": "FC Barcelona",
-  "corto": "BARCELONA"
- },
- "getafe-cf": {
-  "nombre": "Getafe C.F",
-  "corto": "GETAFE"
- },
- "levante-ud": {
-  "nombre": "Levante UD",
-  "corto": "LEVANTE"
- },
- "osasuna": {
-  "nombre": "Osasuna",
-  "corto": "OSASUNA"
- },
- "rcd-espanyol-barcelona": {
-  "nombre": "RCD Espanyol Barcelona",
-  "corto": "ESPANYOL"
- },
- "racing-santander": {
-  "nombre": "Racing Santander",
-  "corto": "RACING"
- },
- "rayo-vallecano": {
-  "nombre": "Rayo Vallecano",
-  "corto": "RAYO"
- },
- "real-betis-balompie": {
-  "nombre": "Real Betis Balompié",
-  "corto": "BETIS"
- },
- "real-madrid": {
-  "nombre": "Real Madrid",
-  "corto": "REAL MADRID"
- },
- "sevilla-fc": {
-  "nombre": "Sevilla FC",
-  "corto": "SEVILLA"
+ "union-saint-gilloise": {
+  "nombre": "Union Saint-Gilloise",
+  "corto": "UNION SAINT-GILLOISE"
  },
  "valencia-cf": {
   "nombre": "Valencia CF",
   "corto": "VALENCIA"
  },
+ "viktoria-plzen": {
+  "nombre": "Viktoria Plzeň",
+  "corto": "VIKTORIA PLZEN"
+ },
  "villarreal-cf": {
   "nombre": "Villarreal CF",
   "corto": "VILLARREAL"
- },
- "deportivo-la-coruna": {
-  "nombre": "Deportivo La Coruña",
-  "corto": "DEPORTIVO"
- },
- "malaga-cf": {
-  "nombre": "Málaga CF",
-  "corto": "MÁLAGA"
  }
 }

@@ -94,7 +94,7 @@ def etiquetas(nombre):
 
 # ---------------------------------------------------------------- control de actualidad (obligatorio antes de generar una imagen)
 MAX_DIAS_NOTICIA = 2
-CONTROLADOS = {"entradas", "partemedico", "cumpleanos"}                 # historias basadas en noticias o datos que pueden quedarse viejos
+CONTROLADOS = {"entradas", "partemedico", "cumpleanos", "pronostico"}                 # historias basadas en noticias o datos que pueden quedarse viejos
 RELATIVOS = re.compile(r"\b(hoy|hoxe|ma[ñn][aá]n?a|ma[ñn]á|ayer|onte|ahora mismo|[uú]ltimas? horas?|esta (?:tarde|noche|semana)|este fin de semana|"
                        r"en breve|dende hoxe|desde hoy)\b", re.I)
 
@@ -135,6 +135,20 @@ def control_actualidad(h, jd, datos, hoy):
     return True, f"{info} → OK" + (f" (verificada {jd['verificada'][11:16]})" if jd.get("verificada") else "")
 
 
+def crear_pronostico(datos, hoy, d_datos):
+    """Pronóstico da peña: los viernes, del próximo partido del Celta si se juega de viernes a lunes. Crea pronostico_celta.json a partir del
+    calendario oficial (así la fecha del partido es la del calendario, nunca una frase suelta)."""
+    p = datos.get("proximo_celta.json")
+    f = fecha_de(p) if p else None
+    if hoy.weekday() != 4 or not p or not f or not (0 <= (f - hoy).days <= 3):
+        return
+    hora = re.search(r"(\d{1,2}:\d{2})", p.get("fecha_hora") or "")
+    pr = {**p, "tipo": "pronostico", "partido_fecha_hora": f"{f.isoformat()}T{hora.group(1) if hora else '00:00'}"}
+    with open(os.path.join(d_datos, "pronostico_celta.json"), "w", encoding="utf-8") as fh:
+        json.dump(pr, fh, ensure_ascii=False, indent=1)
+    datos["pronostico_celta.json"] = pr
+
+
 def plan(hoy, datos, avisos):
     """Devuelve una lista de historias: clave (para no repetir), fichero de datos, momento, hora sugerida y texto."""
     wd = hoy.weekday()
@@ -160,6 +174,13 @@ def plan(hoy, datos, avisos):
         cuando = "Hoxe" if f == hoy else "Mañá"
         add(f"proximo-{nombre}-{d['fecha_hora']}", fichero, "mañana", "10:00",
             f"{cuando} xogamos! {nombre_lado(d, 'local')} - {nombre_lado(d, 'visitante')}, {d['fecha_hora']}. Forza! 💙 {etiquetas(nombre)}")
+
+    pr = datos.get("pronostico_celta.json")                       # viernes: pronóstico da peña (el resultado lo pone la gente con la enquisa)
+    if pr and pr.get("_fecha"):
+        loc, vis = nombre_lado(pr, "local"), nombre_lado(pr, "visitante")
+        add(f"pronostico-{pr['_fecha']}", "pronostico_celta.json", "mañana", "10:00",
+            f"🔮 PRONÓSTICO DA PEÑA: {loc} - {vis} ({pr['fecha_hora']}). Cal será o resultado? Responde coa túa aposta: "
+            f"1 ({loc}) · X (empate) · 2 ({vis}) 💙 {etiquetas('celta')}")
 
     def corto(d):
         return re.sub(r"[^a-z0-9]+", "-", (d.get("_url") or "").rstrip("/").split("/")[-1].lower())[:60]
@@ -306,6 +327,7 @@ def main():
     ok = [correr(s, args, etq, avisos) for s, args, etq in fuentes]
 
     datos = {f: cargar(os.path.join(d_datos, f)) for f in os.listdir(d_datos) if f.endswith(".json")}
+    crear_pronostico(datos, hoy, d_datos)
     estado = cargar(ESTADO) or {}
     historias = []
     controles = []

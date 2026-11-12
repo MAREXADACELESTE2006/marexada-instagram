@@ -436,6 +436,87 @@ def partemedico(datos):
     return img
 
 
+# ---------------------------------------------------------------- pronóstico da peña (diseño verde propio, distinto del resto)
+VERDE = (150, 232, 190)            # menta claro: acento del pronóstico
+VERDE_OSCURO = (6, 40, 28)
+
+
+def fondo_verde():
+    img = Image.open(os.path.join(ASSETS, "fondos", "pronostico_verde.jpg")).convert("RGB").resize((W, H), Image.LANCZOS)
+    img = Image.blend(img, Image.new("RGB", (W, H), VERDE_OSCURO), 0.08)
+    sombra = Image.new("L", (W, H), 0)
+    sd = ImageDraw.Draw(sombra)
+    for y in range(H):                                          # más oscuro arriba (título) y abajo (pie)
+        sd.line([(0, y), (W, y)], fill=int(max(0, 1 - y / 560) * 105 + max(0, (y - 1400) / 520) * 120))
+    img.paste(Image.new("RGB", (W, H), (2, 18, 12)), (0, 0), sombra)
+    return img
+
+
+def _corto(datos, lado):
+    return nombre(datos, lado)
+
+
+def pronostico(datos):
+    global AZUL, NAVY
+    AZUL, NAVY = VERDE, VERDE_OSCURO                              # acento menta en todo el diseño (escudos sin imagen, pie...)
+    img = fondo_verde(); d = ImageDraw.Draw(img)
+    center(d, 125, etiqueta_equipo(datos), font(42), fill=VERDE)
+    center(d, 175, "PRONÓSTICO", fit(d, "PRONÓSTICO", 128, W - 90))
+    center(d, 322, "DA PEÑA", font(76), fill=VERDE)
+    comp = {"copa": "Copa do Rei", "europa": "UEFA Europa League", "laliga": "LaLiga EA Sports", "hypermotion": "LaLiga Hypermotion"}.get(datos.get("logo"))
+    j = (datos.get("jornada") or "").strip()
+    texto_comp = j if (j and not re.search(r"\bX$", j)) else comp
+    if texto_comp:
+        center(d, 432, texto_comp, fit(d, texto_comp, 40, W - 120), fill=(214, 240, 226))
+    cy = 705
+    escudo(img, 215, cy, datos.get("local"), siglas(nombre(datos, "local")))
+    escudo(img, 865, cy, datos.get("visitante"), siglas(nombre(datos, "visitante")))
+    center(d, cy - 43, "VS", font(80), fill=VERDE)
+    nombres_bajo_escudos(d, datos, y=cy + 190)
+    dia, hora = fecha_larga(datos.get("fecha_hora"))
+    if dia:                                                       # píldora menta con el día y la hora
+        cad = f"{dia} · {hora} h" if hora else dia
+        f = fit(d, cad, 46, W - 200, 28)
+        tw = d.textlength(cad, font=f)
+        d.rounded_rectangle([W // 2 - tw / 2 - 40, 1038, W // 2 + tw / 2 + 40, 1112], 37, fill=VERDE)
+        d.text((W // 2 - tw / 2, 1046), cad, font=f, fill=VERDE_OSCURO)
+    center(d, 1158, "Cal será o resultado?", fit(d, "Cal será o resultado?", 62, W - 100, 36))
+    etiquetas_1x2 = (("1", _corto(datos, "local")), ("X", "Empate"), ("2", _corto(datos, "visitante")))
+    for (letra, txt), cx in zip(etiquetas_1x2, (215, 540, 865)):
+        cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        ImageDraw.Draw(cap).ellipse([cx - 62, 1290, cx + 62, 1414], fill=(4, 30, 20, 190))
+        img.paste(cap, (0, 0), cap)
+        d = ImageDraw.Draw(img)
+        d.ellipse([cx - 62, 1290, cx + 62, 1414], outline=VERDE, width=6)
+        center(d, 1318, letra, font(70), x=cx)
+        center(d, 1424, txt, fit(d, txt, 28, 300, 18), fill=(214, 240, 226), x=cx)
+    center(d, 1488, "Responde co teu pronóstico!", fit(d, "Responde co teu pronóstico!", 40, W - 120, 26), fill=VERDE)
+    pie(img, d)
+    return img
+
+
+# ---------------------------------------------------------------- tal semana coma esta (partido histórico)
+def efemeride(datos):
+    img = fondo(); d = ImageDraw.Draw(img)
+    cabecera(img, d, datos.get("serie", "TAL SEMANA COMA ESTA"), datos["titulo"], None, ytitulo=205)
+    y = 430
+    for txt, tam, col in ((datos.get("fecha_texto"), 52, WHITE), (datos.get("competicion_texto"), 38, AZUL)):
+        if txt:
+            center(d, y, txt, fit(d, txt, tam, W - 100, 26), fill=col); y += 70
+    encuentro(img, d, datos, f"{datos['goles_local']} - {datos['goles_visitante']}")
+    if datos.get("frase"):
+        for i, l in enumerate(_lineas(d, datos["frase"], font(46), W - 160, 2)):
+            center(d, 1300 + i * 58, l, font(46), fill=AZUL)
+    gl, gv = datos.get("goleadores_local", []), datos.get("goleadores_visitante", [])
+    if gl or gv:
+        y = 1415
+        for lista, x in ((gl, 215), (gv, 865)):
+            for i, g in enumerate(lista[:5]):
+                center(d, y + i * 38, g, fit(d, g, 30, 420), fill=(214, 228, 246), x=x)
+    pie(img, d)
+    return img
+
+
 # ---------------------------------------------------------------- entradas a la venta
 def entradas(datos):
     img = fondo(); d = ImageDraw.Draw(img)
@@ -616,4 +697,4 @@ def previa(datos):
     return img
 
 
-RENDER = {"cumpleanos": cumpleanos, "entradas": entradas, "partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}
+RENDER = {"pronostico": pronostico, "efemeride": efemeride, "cumpleanos": cumpleanos, "entradas": entradas, "partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}

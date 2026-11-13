@@ -105,12 +105,41 @@ class Cuerpo(HTMLParser):
             self._buf.append(data)
 
 
+def articulo_plan_b(html):
+    """v32: si la web cambia su estructura (el título dentro de <header>, sin <h1>...) y el lector normal no saca nada, se lee el texto de otra forma."""
+    import html as _h
+    m = (re.search(r'property="og:title"[^>]*content="([^"]+)"', html) or re.search(r'content="([^"]+)"[^>]*property="og:title"', html)
+         or re.search(r"<h1[^>]*>(.*?)</h1>", html, re.S | re.I) or re.search(r"<title[^>]*>(.*?)</title>", html, re.S | re.I))
+    titulo = re.sub(r"\s+", " ", _h.unescape(re.sub(r"<[^>]+>", " ", m.group(1)))).strip() if m else ""
+    titulo = re.sub(r"\s*[|\u2013-]\s*(RC\s*)?Celta.*$", "", titulo).strip() or titulo
+    t = re.sub(r"(?is)<(script|style|noscript|svg|nav|footer|form|button)\b.*?</\1>", " ", html)
+    t = re.sub(r"(?i)</?(p|div|li|h[1-6]|br|tr|section|article|header|ul|ol|span)\b[^>]*>", "\n", t)
+    t = _h.unescape(re.sub(r"<[^>]+>", " ", t))
+    lineas = [re.sub(r"\s+", " ", x).strip() for x in t.split("\n")]
+    lineas = [x for x in lineas if x]
+    ini = 0
+    clave = titulo[:25].lower()
+    for i, x in enumerate(lineas):
+        if clave and x.lower().startswith(clave):
+            ini = i
+            break
+    lineas = lineas[ini + 1:]
+    fechas = [i for i, x in enumerate(lineas) if re.match(r"RC\s*Celta\s*\d{1,2}[-/ ]\w+[-/ ]\d{4}", x)]
+    fin = fechas[1] + 1 if len(fechas) > 1 else min(len(lineas), 40)
+    return titulo, "\n".join(lineas[:fin])
+
+
 def articulo(html):
     p = Cuerpo()
     p.feed(html)
     p._cortar()
     titulo = re.sub(r"\s+", " ", p.titulo).strip()
-    return titulo, "\n".join(p.lineas)
+    texto = "\n".join(p.lineas)
+    if not titulo or len(texto) < 80:
+        t2, x2 = articulo_plan_b(html)
+        if len(x2) > len(texto):
+            return t2 or titulo, x2
+    return titulo, texto
 
 
 MES_RX = "(?:" + "|".join(sorted(rccelta.MESES, key=len, reverse=True)) + ")"
@@ -164,7 +193,8 @@ def main():
             if not CANDIDATA.search(titulo_lista):
                 continue
             try:
-                titulo, texto = articulo(descargar(url, a.desde))
+                html_txt = descargar(url, a.desde)
+                titulo, texto = articulo(html_txt)
                 tipo, datos = rccelta.articulo_a_datos(titulo or titulo_lista, texto)
             except Exception as e:
                 avisos.append(f"{equipo}: error leyendo «{titulo_lista}»: {e}")
@@ -174,7 +204,7 @@ def main():
                 continue
             if not datos:
                 avisos.append(f"{equipo}: no se pudo interpretar «{titulo_lista}» (formato nuevo)")
-                diagnostico.append(f"=== {equipo} · {titulo_lista}\n{url}\n--- titulo leido: {titulo!r}\n--- texto leido ({len(texto)} caracteres):\n{texto[:3000]}\n")
+                diagnostico.append(f"=== {equipo} · {titulo_lista}\n{url}\n--- titulo leido: {titulo!r}\n--- texto leido ({len(texto)} caracteres):\n{texto[:3000]}\n--- html descargado ({len(html_txt)} caracteres), principio:\n{html_txt[:1500]}\n")
                 continue
             hecho.add(clave)
             html_art = descargar(url, a.desde)

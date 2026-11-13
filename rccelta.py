@@ -154,7 +154,7 @@ def detectar_equipo(titulo):
 
 
 def fecha_hora(texto):
-    m = re.search(r"(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo),?\s*(\d{1,2}) de (\w+).{0,25}?(\d{1,2})[:.](\d{2})", texto, re.I | re.S)
+    m = re.search(r"(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo),?\s*(\d{1,2}) de (\w+).{0,45}?(\d{1,2})[:.](\d{2})", texto, re.I | re.S)
     if m:
         mes = MESES.get(m.group(3).lower())
         if mes:
@@ -242,6 +242,10 @@ def parse_convocatoria(titulo, texto):
             break
     if not rival:  # "Convocatoria ... para su visita al estadio «El Molinón»": el rival va en el cuerpo
         mr = re.search(r"horas,?\s*(?:al|a la|a los|a las|a)\s+(.+?)\.\s", texto)
+        if mr:
+            rival = mr.group(1).strip()
+    if not rival:  # v29: "El Celta visitará mañana, viernes 13 de noviembre, al Salamanca CF UDS a las 21:00h." (título sin rival, hora con "h")
+        mr = re.search(r"\b(?:visitar[aá]|recibir[aá])\b[^.]*?\b(?:al|a la|a los|a las)\s+(.+?)(?:\s+a las\b|\s+en\b|,|\.\s)", texto[:450])
         if mr:
             rival = mr.group(1).strip()
     if not rival:

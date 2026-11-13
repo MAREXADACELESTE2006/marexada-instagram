@@ -33,6 +33,7 @@ ESTADO = os.path.join(BASE, "estado", "publicado.json")
 AGENDA = os.path.join(BASE, "estado", "agenda.json")           # fechas de los partidos cercanos (la usa el modo rápido para saber si hay algo que vigilar)
 RAPIDAS = {"calendario.py", "noticias.py", "resultados.py", "futbolme.py", "besoccer.py"}     # fuentes del modo rápido: convocatorias y resultados
 CLAVES_RAPIDAS = ("convocatoria-", "cronica-", "resultado-")
+SOLO_CON_GOLEADORES = ("celta", "fortuna")   # v29: del Celta y del Fortuna solo sale el resultado de la crónica del club (con goleadores); sin crónica, no se saca el del marcador
 HASHTAGS = "#RCCelta #Celta #MarexadaCeleste"
 
 RECORDATORIOS = {
@@ -256,7 +257,7 @@ def plan(hoy, datos, avisos):
     for nombre, fichero in (("celta", "resultado_celta.json"), ("fortuna", "resultado_fortuna.json"), ("as-celtas-fem", "resultado_as_celtas_fem.json")):
         r = datos.get(fichero)
         f = fecha_de(r)
-        if not r or not f or not (0 <= (hoy - f).days <= 1) or nombre in con_cronica:
+        if not r or not f or not (0 <= (hoy - f).days <= 1) or nombre in con_cronica or nombre in SOLO_CON_GOLEADORES:
             continue                                   # si hay crónica (con goleadores) no se saca la del marcador
         cierre = "Orgullosas do AS Celtas!" if nombre == "as-celtas-fem" else "Forza Celta!"
         add(f"resultado-{nombre}-{r['fecha_hora']}-{r['goles_local']}-{r['goles_visitante']}", fichero, "resultado", "xusto ao rematar o partido",

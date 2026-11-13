@@ -227,34 +227,125 @@ def lista_pildoras(img, d, jugadores, y0, filas_max, titulo=None):
     return y0 + filas * (ph + 10)
 
 
+def _rgba(img, caja, radio, relleno, borde=None, grosor=2):
+    """Rectángulo redondeado translúcido."""
+    cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(cap).rounded_rectangle(caja, radio, fill=relleno, outline=borde, width=grosor)
+    img.paste(cap, (0, 0), cap)
+
+
+def _escudo_redondo(img, cx, cy, slug, siglas_txt, r=118):
+    """Escudo en círculo blanco con aro de color y sombra (versión v33, más pequeña que escudo())."""
+    sombra = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(sombra).ellipse([cx - r + 3, cy - r + 12, cx + r + 3, cy + r + 12], fill=(0, 0, 0, 120))
+    caja = (cx - r - 40, cy - r - 40, cx + r + 40, cy + r + 40)
+    sombra = sombra.crop(caja).filter(ImageFilter.GaussianBlur(11))
+    img.paste(sombra, caja[:2], sombra)
+    d = ImageDraw.Draw(img)
+    d.ellipse([cx - r - 7, cy - r - 7, cx + r + 7, cy + r + 7], fill=AZUL)          # aro de color
+    m = glob.glob(os.path.join(ASSETS, "escudos", f"{slug}-logo-footylogos.png"))
+    if m:
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=WHITE)
+        c = Image.open(m[0]).convert("RGBA")
+        c = c.crop(c.getbbox())
+        k = min(r * 1.45 / c.width, r * 1.45 / c.height)
+        c = c.resize((max(1, int(c.width * k)), max(1, int(c.height * k))), Image.LANCZOS)
+        img.paste(c, (cx - c.width // 2, cy - c.height // 2), c)
+    else:
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(20, 52, 104))
+        center(d, cy - 40, siglas_txt, font(84), fill=WHITE, x=cx)
+
+
+def _tarjeta_jugador(img, d, x, y, w, h, dorsal, nom):
+    _rgba(img, [x, y, x + w, y + h], h // 2, (255, 255, 255, 30), borde=(255, 255, 255, 46), grosor=1)
+    r = h // 2 - 4
+    cx, cy = x + h // 2, y + h // 2
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=AZUL)
+    if dorsal:
+        fd = fit(d, str(dorsal), h * 0.44, r * 1.7, 14)
+        tw = d.textlength(str(dorsal), font=fd)
+        d.text((cx - tw / 2, cy - fd.size * 0.70), str(dorsal), font=fd, fill=NAVY)
+    fn = fit(d, nom, max(24, h * 0.50), w - h - 24, 18)
+    d.text((x + h + 8, cy - fn.size * 0.70), nom, font=fn, fill=WHITE)
+
+
 def convocatoria(datos):
     img = fondo(); d = ImageDraw.Draw(img)
     tag = {"CELTA FORTUNA": "CELTA FORTUNA"}.get(datos.get("tag"), "REAL CLUB CELTA DE VIGO")
-    center(d, 150, "CONVOCATORIA", font(96))
-    center(d, 270, tag, font(44), fill=AZUL)
-    rival = nombre(datos, "visitante" if datos["local"] == "celta-vigo" else "local")
-    vs = f"vs {rival}" if datos["local"] == "celta-vigo" else f"en {rival}"
-    center(d, 340, vs, fit(d, vs, 62, W - 100))
+    # --- cabecera: competición, título y filete con rombo
+    logo = datos.get("logo")
+    if logo in LOGOS:
+        pegar(img, os.path.join(ASSETS, "marca", LOGOS[logo]), W // 2 - 42, 118, (84, 84))
+        yt = 212
+    else:
+        yt = 150
+    center(d, yt, "CONVOCATORIA", fit(d, "CONVOCATORIA", 100, W - 90))
+    center(d, yt + 116, tag, font(36), fill=AZUL)
+    yl = yt + 176
+    d.line([(150, yl), (W // 2 - 26, yl)], fill=AZUL, width=3)
+    d.line([(W // 2 + 26, yl), (W - 150, yl)], fill=AZUL, width=3)
+    _rombo(d, W // 2, yl, 9, AZUL)
+    # --- el partido: escudos de los dos equipos con VS en medio
+    cy = yl + 128
+    for lado, cx in (("local", 270), ("visitante", 810)):
+        _escudo_redondo(img, cx, cy, datos[lado], siglas(nombre(datos, lado)), r=98)
+        n = nombre(datos, lado)
+        pal = n.split()
+        lineas = [n]
+        if d.textlength(n, font=font(36)) > 420 and len(pal) > 1:
+            k = min(range(1, len(pal)), key=lambda i: abs(len(" ".join(pal[:i])) - len(" ".join(pal[i:]))))
+            lineas = [" ".join(pal[:k]), " ".join(pal[k:])]
+        for i, l in enumerate(lineas):
+            center(d, cy + 118 + i * 44, l, fit(d, l, 36, 420), x=cx)
+    center(d, cy - 38, "VS", font(64), fill=AZUL)
+    # --- fecha, hora y estadio
     dia, hora = fecha_larga(datos.get("fecha_hora"))
-    linea = " · ".join(x for x in (dia, hora) if x)
+    yp = cy + 118 + 44 + 52
+    linea = " · ".join(x for x in (dia, f"{hora} h" if hora else None) if x)
     if linea:
-        center(d, 425, linea, fit(d, linea, 44, W - 100), fill=AZUL)
+        f = fit(d, linea, 44, W - 220)
+        tw = d.textlength(linea, font=f)
+        _rgba(img, [W // 2 - tw / 2 - 40, yp, W // 2 + tw / 2 + 40, yp + 78], 39, (255, 255, 255, 34), borde=AZUL, grosor=3)
+        center(d, yp + 14, linea, f, fill=WHITE)
+        yp += 78
+    if datos.get("lugar"):
+        center(d, yp + 16, datos["lugar"], fit(d, datos["lugar"], 32, W - 140), fill=(200, 218, 240))
+        yp += 56
+    # --- bajas (se calculan antes para reservar su sitio)
     bajas = datos.get("bajas", [])
-    fondo_lista = 1530 - (170 if bajas else 0)
-    y = lista_pildoras(img, d, datos["convocados"], 520, fondo_lista - 520)
+    lineas_b, alto_b = [], 0
     if bajas:
-        d.text((70, y + 22), "BAIXAS", font=font(30), fill=AZUL)
-        f = font(32)
-        linea, yy = "", y + 68
-        for nom in [b["nombre"] for b in bajas]:
-            prueba = (linea + ", " if linea else "") + nom
-            if d.textlength(prueba, font=f) > W - 140 and linea:
-                d.text((70, yy), linea + ",", font=f, fill=(214, 228, 246))
-                linea, yy = nom, yy + 42
+        f = font(30)
+        act = ""
+        for pal in ", ".join(b["nombre"] for b in bajas).split(" "):
+            prueba = (act + " " + pal).strip()
+            if d.textlength(prueba, font=f) > W - 200 and act:
+                lineas_b.append(act); act = pal
             else:
-                linea = prueba
-        d.text((70, yy), linea, font=f, fill=(214, 228, 246))
-    pie(img, d)
+                act = prueba
+        lineas_b.append(act)
+        alto_b = 58 + 38 * len(lineas_b)
+    # --- lista de convocados en tarjetas de dos columnas
+    y0 = yp + 36
+    fin = 1590 - (alto_b + 16 if bajas else 0)
+    conv = datos["convocados"]
+    filas = (len(conv) + 1) // 2
+    ph = max(38, min(72, (fin - y0 - 26) // max(filas, 1) - 10))
+    alto = filas * (ph + 10) + 22
+    _rgba(img, [40, y0 - 12, W - 40, y0 - 12 + alto], 30, (4, 12, 30, 105))
+    for i, j in enumerate(conv):
+        col, fila = divmod(i, filas)
+        _tarjeta_jugador(img, d, 62 + col * 489, y0 + fila * (ph + 10), 467, ph, j.get("dorsal"), j["nombre"])
+    y = y0 - 12 + alto + 16
+    if bajas:
+        _rgba(img, [40, y, W - 40, y + alto_b], 24, (190, 40, 60, 70), borde=(255, 150, 160, 150), grosor=2)
+        d.text((70, y + 12), "BAIXAS", font=font(26), fill=(255, 190, 196))
+        for i, l in enumerate(lineas_b):
+            d.text((70, y + 52 + i * 38), l, font=font(30), fill=(255, 232, 234))
+    # --- pie compacto
+    pegar(img, os.path.join(ASSETS, "marca", "escudo_marexada.png"), W // 2 - 55, 1630, (110, 110))
+    center(d, 1750, "MAREXADA CELESTE", font(42))
+    center(d, 1806, "marexadaceleste.com", font(30), fill=AZUL)
     return img
 
 

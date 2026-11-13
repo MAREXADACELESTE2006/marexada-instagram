@@ -495,10 +495,95 @@ def pronostico(datos):
     return img
 
 
+# ---------------------------------------------------------------- esta semana na historia celeste: portada
+def fondo_historico():
+    """Fondo en blanco y negro teñido de celeste (aspecto de foto antigua), con viñeta y grano."""
+    import random
+    from PIL import ImageOps
+    ruta = os.path.join(ASSETS, "fondos", "historia.jpg")
+    if not os.path.exists(ruta):
+        ruta = os.path.join(ASSETS, "fondos", "historia_provisional.jpg")
+    gris = ImageOps.autocontrast(Image.open(ruta).convert("L").resize((W, H), Image.LANCZOS), cutoff=2)
+    img = ImageOps.colorize(gris, black=(3, 10, 26), white=(120, 176, 226)).convert("RGB")
+    img = Image.blend(img, Image.new("RGB", (W, H), (6, 22, 50)), 0.45)
+    vig = Image.new("L", (W, H), 0)
+    vd = ImageDraw.Draw(vig)
+    for i in range(60):                                          # viñeta: oscurece los bordes
+        vd.rectangle([i * 9, i * 16, W - i * 9, H - i * 16], outline=int(150 * (1 - i / 60) ** 2), width=18)
+    img.paste(Image.new("RGB", (W, H), (2, 8, 20)), (0, 0), vig.filter(ImageFilter.GaussianBlur(40)))
+    rnd = random.Random(7)                                       # grano de película
+    grano = Image.new("L", (W // 2, H // 2))
+    grano.putdata([rnd.randint(110, 146) for _ in range(W // 2 * H // 2)])
+    grano = grano.resize((W, H), Image.NEAREST)
+    return Image.blend(img, Image.merge("RGB", (grano, grano, grano)), 0.07)
+
+
+def _texto_borde(d, y, txt, f, fill, borde=(4, 14, 34), grosor=7, x=W // 2):
+    d.text((x - d.textlength(txt, font=f) / 2, y), txt, font=f, fill=fill, stroke_width=grosor, stroke_fill=borde)
+
+
+def _rombo(d, cx, cy, r, fill):
+    d.polygon([(cx, cy - r), (cx + r, cy), (cx, cy + r), (cx - r, cy)], fill=fill)
+
+
+def historia_portada(datos):
+    global AZUL
+    img = fondo_historico(); d = ImageDraw.Draw(img)
+    CEL = (150, 208, 255)
+    # marco fino de «cartel antiguo»
+    d.rectangle([34, 34, W - 34, H - 34], outline=CEL, width=3)
+    d.rectangle([48, 48, W - 48, H - 48], outline=(CEL[0] // 2, CEL[1] // 2, CEL[2] // 2), width=2)
+    # título: la serie es lo principal
+    l1, l2, l3 = datos.get("titulo_serie", ["ESTA SEMANA", "NA HISTORIA", "CELESTE"])
+    _texto_borde(d, 130, l1, fit(d, l1, 150, W - 120), WHITE)
+    _texto_borde(d, 285, l2, fit(d, l2, 150, W - 120), WHITE)
+    f3 = fit(d, l3, 235, W - 100)
+    _texto_borde(d, 440, l3, f3, CEL, grosor=9)
+    # banda con el tema de la semana
+    tema = datos.get("tema", "DERBIS GALEGOS DE NOVEMBRO")
+    ft = fit(d, tema, 46, W - 230, 28)
+    tw = d.textlength(tema, font=ft)
+    d.rounded_rectangle([W // 2 - tw / 2 - 60, 735, W // 2 + tw / 2 + 60, 825], 45, fill=CEL)
+    d.text((W // 2 - tw / 2, 750), tema, font=ft, fill=(5, 22, 52))
+    _rombo(d, int(W // 2 - tw / 2 - 100), 780, 14, CEL)
+    _rombo(d, int(W // 2 + tw / 2 + 100), 780, 14, CEL)
+    # escudos
+    cy = 1000
+    escudo_mini(img, 300, cy, datos["local"], siglas(nombre(datos, "local")), r=105)
+    escudo_mini(img, 780, cy, datos["visitante"], siglas(nombre(datos, "visitante")), r=105)
+    d = ImageDraw.Draw(img)
+    _texto_borde(d, cy - 40, "VS", font(76), CEL, grosor=5, x=540)
+    # tres fechas
+    y0 = 1190
+    n = len(datos["fechas"])
+    paso = 310
+    x0 = W // 2 - (n - 1) * paso / 2
+    for i, (anio, etiqueta) in enumerate(datos["fechas"]):
+        cx = int(x0 + i * paso)
+        cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        ImageDraw.Draw(cap).rounded_rectangle([cx - 140, y0, cx + 140, y0 + 150], 20, fill=(5, 20, 48, 215), outline=CEL + (255,), width=3)
+        img.paste(cap, (0, 0), cap)
+        d = ImageDraw.Draw(img)
+        center(d, y0 + 10, str(anio), font(76), x=cx)
+        center(d, y0 + 108, etiqueta, fit(d, etiqueta, 28, 260, 18), fill=CEL, x=cx)
+    # invitación a pasar
+    txt = datos.get("pie", "DESLIZA PARA VER OS PARTIDOS")
+    fp = fit(d, txt, 40, W - 220, 26)
+    _texto_borde(d, 1400, txt, fp, CEL, grosor=4)
+    xm = W // 2
+    for dx in (-24, 6):
+        d.line([(xm + dx - 14, 1478), (xm + dx + 8, 1498), (xm + dx - 14, 1518)], fill=CEL, width=8, joint="curve")
+    AZUL = (146, 202, 246)
+    pie(img, d)
+    return img
+
+
 # ---------------------------------------------------------------- tal semana coma esta (partido histórico)
 def efemeride(datos):
     img = fondo(); d = ImageDraw.Draw(img)
-    cabecera(img, d, datos.get("serie", "TAL SEMANA COMA ESTA"), datos["titulo"], None, ytitulo=205)
+    serie = datos.get("serie", "TAL SEMANA COMA ESTA")
+    center(d, 140, serie, fit(d, serie, 44, W - 80, 28), fill=AZUL)
+    center(d, 205, datos["titulo"], fit(d, datos["titulo"], 86, W - 100), fill=WHITE)
     y = 430
     for txt, tam, col in ((datos.get("fecha_texto"), 52, WHITE), (datos.get("competicion_texto"), 38, AZUL)):
         if txt:
@@ -697,4 +782,4 @@ def previa(datos):
     return img
 
 
-RENDER = {"pronostico": pronostico, "efemeride": efemeride, "cumpleanos": cumpleanos, "entradas": entradas, "partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}
+RENDER = {"historia_portada": historia_portada, "pronostico": pronostico, "efemeride": efemeride, "cumpleanos": cumpleanos, "entradas": entradas, "partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}

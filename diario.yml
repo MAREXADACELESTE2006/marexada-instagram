@@ -2,37 +2,50 @@ name: Historias diarias (revisión)
 
 on:
   schedule:
-    - cron: "0 6 * * *"        # 06:00 UTC = 07:00 (invierno) / 08:00 (verano) en Galicia. GitHub puede retrasarlo unos minutos
-    - cron: "30 22 * * *"      # 22:30 UTC = 23:30 (invierno) / 00:30 (verano): recoge el resultado de los partidos de la tarde-noche
-  workflow_dispatch:           # botón "Run workflow" para probarlo a mano
+    # --- Ejecuciones COMPLETAS (todo: parte médico, entradas, cumpleaños, clasificaciones, resumen...) ---
+    - cron: "0 6 * * *"            # 06:00 UTC = 07:00 (invierno) / 08:00 (verano) en Galicia
+    - cron: "30 16 * * *"          # 17:30 / 18:30
+    - cron: "30 22 * * *"          # 23:30 / 00:30
+    # --- Ejecuciones RÁPIDAS (solo convocatorias y resultados) ---
+    - cron: "5,35 9-13 * * *"      # cada 30 min de 10:05 a 14:35 (invierno): para pillar la convocatoria cuando la publica el club
+    - cron: "5,35 14-22 * * 4-6,0,1"   # cada 30 min de 15:05 a 23:35 (invierno), de jueves a lunes: para sacar los resultados al acabar el partido
+  workflow_dispatch:               # botón "Run workflow" para probarlo a mano (hace una ejecución completa)
 
 permissions:
-  contents: write              # para guardar estado/publicado.json (lo ya generado) en el repositorio
+  contents: write                  # para guardar estado/publicado.json y estado/agenda.json en el repositorio
+
+concurrency:
+  group: historias                 # una ejecución cada vez: así no se repiten historias ni se pisa el estado
+  cancel-in-progress: false
 
 jobs:
   historias:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
+    env:
+      MODO: ${{ (github.event_name == 'workflow_dispatch' || contains(fromJSON('["0 6 * * *","30 16 * * *","30 22 * * *"]'), github.event.schedule)) && 'completo' || 'rapido' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
       - run: pip install -r requirements.txt
-      - name: Generar las historias de hoy
+      - name: Generar las historias
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python diario.py
+        run: python diario.py --modo "$MODO"
       - name: Guardar las historias para descargarlas
         uses: actions/upload-artifact@v4
         with:
           name: historias
           path: salida/
           retention-days: 14
+          if-no-files-found: ignore
       - name: Recordar lo ya generado
         run: |
           git config user.name "marexada-bot"
           git config user.email "marexada-bot@users.noreply.github.com"
-          git add estado/publicado.json
+          git add estado/
           git diff --cached --quiet || (git commit -m "Estado del $(date -u +%F)" && git push)

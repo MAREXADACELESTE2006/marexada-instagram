@@ -27,8 +27,8 @@ CATEGORIAS = {
     "celta": ["https://rccelta.es/categorias-actualidad-equipo/primer-equipo/"],
     "fortuna": ["https://rccelta.es/categorias-actualidad-fundacion/celta-fortuna/", "https://rccelta.es/fundacion/actualidad/"],
 }
-MAX_NOTICIAS = 12                       # cuántas noticias de cada lista se miran
-CANDIDATA = re.compile(r"^Convocatoria del Celta|\d+\s*[-–]\s*\d+", re.I)   # título de convocatoria o con marcador
+MAX_NOTICIAS = 16                       # cuántas noticias de cada lista se miran
+CANDIDATA = re.compile(r"Convocatoria del Celta|\d+\s*[-–]\s*\d+", re.I)   # título de convocatoria o con marcador
 BASURA = re.compile(r"^(continued|seguir leyendo|ler m[aá]is|leer m[aá]s|read more|m[aá]s|ver m[aá]s)\W*$", re.I)
 ENLACE = re.compile(r'<a\b[^>]*?href="([^"]*?/(?:equipo|fundacion)/actualidad/[^"/]+/?)"[^>]*>(.*?)</a>', re.I | re.S)
 SALTAR = {"script", "style", "nav", "header", "footer", "aside", "noscript", "form", "button", "svg"}
@@ -113,11 +113,30 @@ def articulo(html):
     return titulo, "\n".join(p.lineas)
 
 
+MES_RX = "(?:" + "|".join(sorted(rccelta.MESES, key=len, reverse=True)) + ")"
+
+
 def fecha_iso(texto):
-    m = re.search(r"RC Celta\s+(\d{1,2})-(\w+)-(\d{4})", texto)
-    if m and rccelta.MESES.get(m.group(2).lower()):
-        return datetime.date(int(m.group(3)), rccelta.MESES[m.group(2).lower()], int(m.group(1))).isoformat()
+    """Fecha de publicación de la noticia («RC Celta 12-noviembre-2026»). Tolera que «RC Celta» y la fecha vengan pegados o separados."""
+    for rx in (r"RC\s*Celta\s*(\d{1,2})[-/ ]([A-Za-zñáéíóú]+)[-/ ](\d{4})", rf"\b(\d{{1,2}})[-/ ]({MES_RX})[-/ ](\d{{4}})\b"):
+        for m in re.finditer(rx, texto, re.I):
+            mes = rccelta.MESES.get(m.group(2).lower())
+            if mes:
+                try:
+                    return datetime.date(int(m.group(3)), mes, int(m.group(1))).isoformat()
+                except ValueError:
+                    continue
     return None
+
+
+def fecha_pagina(html):
+    """Plan B: la fecha que la propia página declara (metadatos o datos estructurados) y, si no, cualquier fecha escrita en el HTML."""
+    for rx in (r'article:published_time"[^>]*content="(\d{4}-\d{2}-\d{2})', r'content="(\d{4}-\d{2}-\d{2})[^"]*"[^>]*article:published_time',
+               r'"datePublished"\s*:\s*"(\d{4}-\d{2}-\d{2})', r'"published"\s*:\s*"(\d{4}-\d{2}-\d{2})'):
+        m = re.search(rx, html)
+        if m:
+            return m.group(1)
+    return fecha_iso(re.sub(r"<[^>]+>", " ", html))
 
 
 def main():
@@ -126,7 +145,7 @@ def main():
     ap.add_argument("--salida", default=os.path.join(BASE, "datos_reales"))
     a = ap.parse_args()
     os.makedirs(a.salida, exist_ok=True)
-    avisos, escritos = [], 0
+    avisos, escritos, importantes = [], 0, []
     for equipo, urls in CATEGORIAS.items():
         lista = []
         for u in urls:
@@ -157,16 +176,21 @@ def main():
                 avisos.append(f"{equipo}: no se pudo interpretar «{titulo_lista}» (formato nuevo)")
                 continue
             hecho.add(clave)
+            html_art = descargar(url, a.desde)
             datos["_url"] = url
-            datos["_fecha"] = fecha_iso(texto)
+            datos["_fecha"] = fecha_iso(texto) or fecha_pagina(html_art)
+            if not datos["_fecha"]:
+                importantes.append(f"{equipo}: no encuentro la fecha de «{titulo_lista}»")
             ruta = os.path.join(a.salida, f"{clave}_{equipo}.json")
             json.dump(datos, open(ruta, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
             print("escrito", ruta, "<-", titulo_lista)
             escritos += 1
-    for x in avisos:
+    for x in avisos + importantes:
         print("aviso:", x, file=sys.stderr)
     if not escritos and avisos:
         sys.exit("ERROR: " + avisos[0])
+    if importantes or [x for x in avisos if "interpretar" in x]:           # que se vea en el resumen: la noticia está pero no se puede usar
+        sys.exit("AVISO: " + "; ".join((importantes + [x for x in avisos if "interpretar" in x])[:2]))
 
 
 if __name__ == "__main__":

@@ -30,6 +30,9 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 MADRID = ZoneInfo("Europe/Madrid")
 ESTADO = os.path.join(BASE, "estado", "publicado.json")
+AGENDA = os.path.join(BASE, "estado", "agenda.json")           # fechas de los partidos cercanos (la usa el modo rápido para saber si hay algo que vigilar)
+RAPIDAS = {"calendario.py", "noticias.py", "resultados.py", "futbolme.py", "besoccer.py"}     # fuentes del modo rápido: convocatorias y resultados
+CLAVES_RAPIDAS = ("convocatoria-", "cronica-", "resultado-")
 HASHTAGS = "#RCCelta #Celta #MarexadaCeleste"
 
 RECORDATORIOS = {
@@ -68,6 +71,49 @@ def correr(script, args, etiqueta, avisos):
         ultima = ((r.stderr or r.stdout).strip().splitlines() or ["sin detalle"])[-1]
         avisos.append(f"{etiqueta}: {ultima}")
     return r.returncode == 0
+
+
+def hay_partido_cerca(hoy):
+    """Modo rápido: ¿hay un partido del Celta, del Fortuna o del AS Celtas ayer, hoy o en los próximos 2 días? Sin agenda guardada, sí."""
+    ag = cargar(AGENDA)
+    if not ag or not ag.get("partidos"):
+        return True
+    for p in ag["partidos"]:
+        try:
+            if -1 <= (datetime.date.fromisoformat(p["fecha"]) - hoy).days <= 2:
+                return True
+        except (KeyError, ValueError):
+            continue
+    return False
+
+
+def guardar_agenda(datos, hoy):
+    """Recuerda las fechas de los próximos partidos y de los últimos resultados (3 días atrás) para que el modo rápido sepa cuándo vigilar."""
+    viejas = (cargar(AGENDA) or {}).get("partidos", [])
+    nuevas = {(p["equipo"], p["fecha"]) for p in viejas if p.get("fecha") and (hoy - datetime.date.fromisoformat(p["fecha"])).days <= 3}
+    for nombre in ("celta", "fortuna", "as_celtas_fem"):
+        for pref in ("proximo", "resultado"):
+            f = fecha_de(datos.get(f"{pref}_{nombre}.json"))
+            if f:
+                nuevas.add((nombre, f.isoformat()))
+    os.makedirs(os.path.dirname(AGENDA), exist_ok=True)
+    json.dump({"actualizada": hoy.isoformat(), "partidos": [{"equipo": e, "fecha": f} for e, f in sorted(nuevas)]},
+              open(AGENDA, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+
+
+def fecha_partido(c, hoy):
+    """Fecha del partido de una convocatoria a partir de su texto «Ven 13/11 · 21:00» (el año se deduce: el más cercano a hoy)."""
+    m = re.search(r"(\d{1,2})/(\d{1,2})", (c or {}).get("fecha_hora") or "")
+    if not m:
+        return None
+    for anio in (hoy.year, hoy.year + 1, hoy.year - 1):
+        try:
+            f = datetime.date(anio, int(m.group(2)), int(m.group(1)))
+        except ValueError:
+            continue
+        if abs((f - hoy).days) <= 40:
+            return f
+    return None
 
 
 def hora_madrid():
@@ -189,11 +235,18 @@ def plan(hoy, datos, avisos):
     for nombre in ("celta", "fortuna"):
         c = datos.get(f"convocatoria_{nombre}.json")
         f = fecha_de(c)
-        if c and f and 0 <= (hoy - f).days <= 1:
+        fp = fecha_partido(c, hoy)
+        # vale si la noticia es de hoy o ayer; si no se sabe su fecha, si el partido es hoy, mañana o pasado mañana
+        vigente = (f is not None and 0 <= (hoy - f).days <= 1) or (f is None and fp is not None and 0 <= (fp - hoy).days <= 2)
+        if c and f is None and fp is None:
+            avisos.append(f"Convocatoria {nombre}: sin fecha de noticia ni de partido; no se publica")
+        if c and vigente:
             add(f"convocatoria-{nombre}-{corto(c)}", f"convocatoria_{nombre}.json", "tarde", "cando a publica o club (ou a tarde)",
                 f"Convocatoria: {nombre_lado(c, 'local')} - {nombre_lado(c, 'visitante')}, {c['fecha_hora']}. Estes son os convocados! 💙 {etiquetas(nombre)}")
         k = datos.get(f"cronica_{nombre}.json")
         f = fecha_de(k)
+        if k and f is None:
+            avisos.append(f"Crónica {nombre}: no se conoce su fecha; no se publica (el resultado sale igual por el calendario)")
         if k and f and 0 <= (hoy - f).days <= 1:
             con_cronica.add(nombre)
             add(f"cronica-{nombre}-{corto(k)}", f"cronica_{nombre}.json", "resultado", "xusto ao rematar o partido",
@@ -254,7 +307,7 @@ def plan(hoy, datos, avisos):
 
 
 # ---------------------------------------------------------------- Telegram (opcional)
-def telegram(historias, resumen, avisos):
+def telegram(historias, resumen, avisos, rapido=False):
     token, chat = os.environ.get("TELEGRAM_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
     if not token or not chat:
         return False
@@ -273,9 +326,11 @@ def telegram(historias, resumen, avisos):
         urllib.request.urlopen(req, timeout=60).read()
 
     try:
-        llamar("sendMessage", {"chat_id": chat, "text": resumen[:4000]})
+        if not rapido:                                             # en modo rápido no se manda el resumen: solo la foto, con su texto, al momento
+            llamar("sendMessage", {"chat_id": chat, "text": resumen[:4000]})
         for h in historias:
-            llamar("sendPhoto", {"chat_id": chat, "caption": f"{h['hora']} · {h['texto']}"[:1000]}, h["imagen"])
+            cab = "⚡ " if rapido else f"{h['hora']} · "
+            llamar("sendPhoto", {"chat_id": chat, "caption": f"{cab}{h['texto']}"[:1000]}, h["imagen"])
         return True
     except Exception as e:
         avisos.append(f"Telegram: {e}")
@@ -291,8 +346,14 @@ def main():
     ap.add_argument("--sin-estado", action="store_true")
     ap.add_argument("--sin-telegram", action="store_true")
     ap.add_argument("--salida", default=os.path.join(BASE, "salida"))
+    ap.add_argument("--modo", choices=("completo", "rapido"), default="completo",
+                    help="rapido: solo convocatorias y resultados (se ejecuta cada 15-20 minutos; si no hay partido cerca, termina enseguida)")
     a = ap.parse_args()
     hoy = datetime.date.fromisoformat(a.hoy) if a.hoy else datetime.datetime.now(MADRID).date()
+    rapido = a.modo == "rapido"
+    if rapido and not a.offline and not hay_partido_cerca(hoy):
+        print("Modo rápido: no hay partidos del Celta, del Fortuna ni del AS Celtas cerca. No hay nada que vigilar.")
+        return
     carpeta = os.path.join(a.salida, hoy.isoformat())
     d_datos = os.path.join(carpeta, "datos")
     shutil.rmtree(carpeta, ignore_errors=True)
@@ -324,16 +385,25 @@ def main():
             ("entradas.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Entradas (rccelta.es)"),
             ("cumpleanos.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Cumpleaños"),
         ]
+    if rapido:
+        fuentes = [f for f in fuentes if f[0] in RAPIDAS]
     ok = [correr(s, args, etq, avisos) for s, args, etq in fuentes]
 
     datos = {f: cargar(os.path.join(d_datos, f)) for f in os.listdir(d_datos) if f.endswith(".json")}
     crear_pronostico(datos, hoy, d_datos)
+    if not a.offline and not a.sin_estado:
+        try:
+            guardar_agenda(datos, hoy)
+        except Exception as e:                                     # la agenda es una ayuda: si falla, no se para nada
+            avisos.append(f"Agenda: {e}")
     estado = cargar(ESTADO) or {}
     historias = []
     controles = []
     for h in plan(hoy, datos, avisos):
         if h["clave"] in estado and not a.forzar:
             continue
+        if rapido and not h["clave"].startswith(CLAVES_RAPIDAS):
+            continue                                              # el modo rápido solo saca convocatorias y resultados
         jd = datos.get(h["fichero"]) or {}
         if jd.get("tipo") in CONTROLADOS:
             ok_c, msg = control_actualidad(h, jd, datos, hoy)
@@ -376,12 +446,12 @@ def main():
     # toca hoy) llega UNA vez al día, en la primera ejecución de la mañana (o siempre que lances el trabajo a mano).
     clave_resumen = f"resumen-{hoy.isoformat()}"
     manual = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
-    resumen_dia = not a.offline and (manual or (5 <= hora_madrid() < 13 and clave_resumen not in estado))
+    resumen_dia = not a.offline and not rapido and (manual or (5 <= hora_madrid() < 13 and clave_resumen not in estado))
     enviado = False
     configurado = bool(os.environ.get("TELEGRAM_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID"))
-    quiere_envio = bool(historias or avisos or resumen_dia)
+    quiere_envio = bool(historias) if rapido else bool(historias or avisos or resumen_dia)     # modo rápido: solo avisa si hay historias (los avisos van en las ejecuciones completas)
     if not a.sin_telegram and not a.offline and quiere_envio:
-        enviado = telegram(historias, resumen, avisos)
+        enviado = telegram(historias, resumen, avisos, rapido)
     # Si Telegram está configurado y el envío falla, no se anota nada: las historias y el resumen se reintentan en la siguiente ejecución.
     fallo_envio = configurado and quiere_envio and not enviado and not a.sin_telegram and not a.offline
     if not a.sin_estado and not a.offline and not fallo_envio:

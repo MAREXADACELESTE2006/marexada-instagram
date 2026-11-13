@@ -191,10 +191,11 @@ def _meta(html, prop):
 
 
 def _fecha_noticia(lineas):
-    for l in lineas:
-        m = FECHA_NOTICIA.match(l)
-        if m and m.group(2).lower() in MESES:
-            return datetime.date(int(m.group(3)), MESES[m.group(2).lower()], int(m.group(1)))
+    texto = " ".join(lineas)
+    for rx in (r"RC\s*Celta\s*(\d{1,2})[-/ ]([A-Za-zñáéíóú]+)[-/ ](\d{4})", r"\b(\d{1,2})-([A-Za-zñáéíóú]+)-(\d{4})\b"):
+        for m in re.finditer(rx, texto):
+            if m.group(2).lower() in MESES:
+                return datetime.date(int(m.group(3)), MESES[m.group(2).lower()], int(m.group(1)))
     return None
 
 
@@ -268,10 +269,10 @@ def articulo(html, nombre, hoy):
     fecha = _fecha_noticia(lineas)
     # texto de la noticia: bloques entre la fecha de publicación y «Etiquetas / Noticias recomendadas»
     bl = bloques_de(html)
-    ini = next((i for i, (_, t) in enumerate(bl) if re.search(r"RC Celta\s+\d{1,2}[-/ ][A-Za-zñáéíóú]+[-/ ]\d{4}", t)), None)
+    ini = next((i for i, (_, t) in enumerate(bl) if re.search(r"RC\s*Celta\s*\d{1,2}[-/ ][A-Za-zñáéíóú]+[-/ ]\d{4}", t)), None)
     cuerpo = []
     for etq, t in bl[(ini + 1) if ini is not None else 0:]:
-        if FIN_TEXTO.match(t) or re.search(r"RC Celta\s+\d{1,2}[-/ ][A-Za-zñáéíóú]+[-/ ]\d{4}", t):
+        if FIN_TEXTO.match(t) or re.search(r"RC\s*Celta\s*\d{1,2}[-/ ][A-Za-zñáéíóú]+[-/ ]\d{4}", t):
             break
         cuerpo.append((etq, t))
     parrafos = [t for e, t in cuerpo if not e.startswith("h") and len(t) > 25]

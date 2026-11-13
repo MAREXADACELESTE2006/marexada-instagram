@@ -160,7 +160,7 @@ def fecha_hora(texto):
         if mes:
             return f"{DIAS[m.group(1).lower()]} {int(m.group(2)):02d}/{mes:02d} · {int(m.group(4)):02d}:{m.group(5)}"
     # "esta tarde a las 18:30 horas": el día es el de publicación ("RC Celta 31-octubre-2026")
-    mp = re.search(r"RC Celta\s+(\d{1,2})-(\w+)-(\d{4})", texto)
+    mp = re.search(r"RC\s*Celta\s*(\d{1,2})-(\w+)-(\d{4})", texto)
     mh = re.search(r"(\d{1,2})[:.](\d{2})\s*horas", texto)
     if mp and mh and re.search(r"\b(hoy|esta (?:tarde|noche|mañana))\b", texto, re.I):
         mes = MESES.get(mp.group(2).lower())
@@ -172,7 +172,7 @@ def fecha_hora(texto):
 
 
 def fecha_publicacion(texto):
-    mp = re.search(r"RC Celta\s+(\d{1,2})-(\w+)-(\d{4})", texto)
+    mp = re.search(r"RC\s*Celta\s*(\d{1,2})-(\w+)-(\d{4})", texto)
     if not mp or not MESES.get(mp.group(2).lower()):
         return None
     f = datetime.date(int(mp.group(3)), MESES[mp.group(2).lower()], int(mp.group(1)))

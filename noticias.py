@@ -145,7 +145,7 @@ def main():
     ap.add_argument("--salida", default=os.path.join(BASE, "datos_reales"))
     a = ap.parse_args()
     os.makedirs(a.salida, exist_ok=True)
-    avisos, escritos, importantes = [], 0, []
+    avisos, escritos, importantes, diagnostico = [], 0, [], []
     for equipo, urls in CATEGORIAS.items():
         lista = []
         for u in urls:
@@ -174,6 +174,7 @@ def main():
                 continue
             if not datos:
                 avisos.append(f"{equipo}: no se pudo interpretar «{titulo_lista}» (formato nuevo)")
+                diagnostico.append(f"=== {equipo} · {titulo_lista}\n{url}\n--- titulo leido: {titulo!r}\n--- texto leido ({len(texto)} caracteres):\n{texto[:3000]}\n")
                 continue
             hecho.add(clave)
             html_art = descargar(url, a.desde)
@@ -185,6 +186,13 @@ def main():
             json.dump(datos, open(ruta, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
             print("escrito", ruta, "<-", titulo_lista)
             escritos += 1
+    if diagnostico:                                                       # v31: deja en estado/ el texto que lee el programa de las noticias que no entiende
+        try:
+            os.makedirs(os.path.join(BASE, "estado"), exist_ok=True)
+            open(os.path.join(BASE, "estado", "diagnostico_noticias.txt"), "w", encoding="utf-8").write("\n".join(diagnostico))
+        except OSError:
+            pass
+        print("\n".join(diagnostico)[:6000], file=sys.stderr)
     for x in avisos + importantes:
         print("aviso:", x, file=sys.stderr)
     if not escritos and avisos:

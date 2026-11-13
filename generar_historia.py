@@ -6,6 +6,7 @@ Se usa desde generar.py (generar_historia.RENDER).  Fondo: assets/fondos/histori
 import datetime
 import glob
 import json
+import math
 import os
 import re
 
@@ -166,40 +167,6 @@ def encuentro(img, d, datos, centro):
 
 
 # ---------------------------------------------------------------- publicaciones
-def proximo(datos):
-    img = fondo(); d = ImageDraw.Draw(img)
-    cabecera(img, d, etiqueta_equipo(datos), "PRÓXIMO PARTIDO", datos.get("logo"), ytitulo=205)
-    jornada(d, datos)
-    encuentro(img, d, datos, "VS")
-    dia, hora = fecha_larga(datos.get("fecha_hora"))
-    if dia:
-        center(d, 1335, dia, fit(d, dia, 62, W - 100))
-    if hora:
-        center(d, 1425, f"{hora} h", font(124), fill=AZUL)
-    if datos.get("lugar"):
-        center(d, 1262, datos["lugar"], fit(d, datos["lugar"], 38, W - 120), fill=(200, 218, 240))
-    pie(img, d)
-    return img
-
-
-def resultado(datos):
-    img = fondo(); d = ImageDraw.Draw(img)
-    cabecera(img, d, etiqueta_equipo(datos), "RESULTADO FINAL", datos.get("logo"))
-    jornada(d, datos)
-    encuentro(img, d, datos, f"{datos['goles_local']} - {datos['goles_visitante']}")
-    dia, _ = fecha_larga(datos.get("fecha_hora"))
-    if dia:
-        center(d, 1310, dia, fit(d, dia, 50, W - 100), fill=AZUL)
-    gl, gv = datos.get("goleadores_local", []), datos.get("goleadores_visitante", [])
-    if gl or gv:
-        y = 1415
-        for lado, lista, x in (("local", gl, 215), ("visitante", gv, 865)):
-            for i, g in enumerate(lista[:5]):
-                center(d, y + i * 38, g, fit(d, g, 30, 420), fill=(214, 228, 246), x=x)
-    pie(img, d)
-    return img
-
-
 def pildora(img, x, y, w, h):
     cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     ImageDraw.Draw(cap).rounded_rectangle([x, y, x + w, y + h], 14, fill=(255, 255, 255, 36))
@@ -256,7 +223,84 @@ def _escudo_redondo(img, cx, cy, slug, siglas_txt, r=118):
         center(d, cy - 40, siglas_txt, font(84), fill=WHITE, x=cx)
 
 
-def _tarjeta_jugador(img, d, x, y, w, h, dorsal, nom):
+def _tag_v33(datos):
+    t = datos.get("tag")
+    return t if t in ("CELTA FORTUNA", "AS CELTAS FEM") else "REAL CLUB CELTA DE VIGO"
+
+
+def _logo_competicion(img, logo, cx, y, lado=144):
+    """Logo de la competición bien visible: baldosa con sombra y borde blanco fino para que no se pierda sobre el fondo (el de la Copa es rojo)."""
+    x = cx - lado // 2
+    caja = (x - 40, y - 30, x + lado + 40, y + lado + 60)
+    sombra = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(sombra).rounded_rectangle([x, y + 10, x + lado, y + lado + 10], int(lado * 0.22), fill=(0, 0, 0, 150))
+    sombra = sombra.crop(caja).filter(ImageFilter.GaussianBlur(12))
+    img.paste(sombra, caja[:2], sombra)
+    borde = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(borde).rounded_rectangle([x - 5, y - 5, x + lado + 5, y + lado + 5], int(lado * 0.24), fill=(255, 255, 255, 235))
+    img.paste(borde, (0, 0), borde)
+    pegar(img, os.path.join(ASSETS, "marca", LOGOS[logo]), x, y, (lado, lado))
+
+
+def _cabecera_v33(img, d, titulo, tag, logo):
+    """Cabecera común: logo de la competición, título grande, equipo y filete con rombo. Devuelve la y del filete."""
+    if logo in LOGOS:
+        _logo_competicion(img, logo, W // 2, 96, 144)
+        yt = 252
+    else:
+        yt = 150
+    center(d, yt, titulo, fit(d, titulo, 100, W - 90))
+    center(d, yt + 116, tag, font(36), fill=AZUL)
+    yl = yt + 176
+    d.line([(150, yl), (W // 2 - 26, yl)], fill=AZUL, width=3)
+    d.line([(W // 2 + 26, yl), (W - 150, yl)], fill=AZUL, width=3)
+    _rombo(d, W // 2, yl, 9, AZUL)
+    return yl
+
+
+def _pie_v33(img, d):
+    """Pie con el escudo de la peña grande y nítido (se usa el original de 1024 px reducido con LANCZOS) y la web debajo."""
+    lado, cy = 188, 1706
+    caja = (W // 2 - lado // 2 - 50, cy - lado // 2 - 40, W // 2 + lado // 2 + 50, cy + lado // 2 + 70)
+    sombra = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(sombra).ellipse([W // 2 - lado // 2, cy - lado // 2 + 10, W // 2 + lado // 2, cy + lado // 2 + 10], fill=(0, 0, 0, 140))
+    sombra = sombra.crop(caja).filter(ImageFilter.GaussianBlur(12))
+    img.paste(sombra, caja[:2], sombra)
+    pegar(img, os.path.join(ASSETS, "marca", "escudo_marexada.png"), W // 2 - lado // 2, cy - lado // 2, (lado, lado))
+    center(d, 1826, "marexadaceleste.com", font(36), fill=AZUL)
+
+
+def _nombre_lineas(d, n, tam, maxw):
+    pal = n.split()
+    if d.textlength(n, font=font(tam)) > maxw and len(pal) > 1:
+        k = min(range(1, len(pal)), key=lambda i: abs(len(" ".join(pal[:i])) - len(" ".join(pal[i:]))))
+        return [" ".join(pal[:k]), " ".join(pal[k:])]
+    return [n]
+
+
+def _bloque_partido(img, d, datos, cy, r=98, centro="VS", cx=(270, 810), tam=36):
+    """Los dos escudos con su nombre debajo y el centro (VS o marcador). Devuelve la y donde acaban los nombres."""
+    fin = cy
+    for lado, x in (("local", cx[0]), ("visitante", cx[1])):
+        _escudo_redondo(img, x, cy, datos[lado], siglas(nombre(datos, lado)), r=r)
+        lineas = _nombre_lineas(d, nombre(datos, lado), tam, 420)
+        for i, l in enumerate(lineas):
+            center(d, cy + r + 20 + i * (tam + 8), l, fit(d, l, tam, 420), x=x)
+        fin = max(fin, cy + r + 20 + len(lineas) * (tam + 8))
+    if centro:
+        center(d, cy - 38, centro, font(64), fill=AZUL)
+    return fin
+
+
+def _pildora_fecha(img, d, y, texto, tam=44, alto=78):
+    f = fit(d, texto, tam, W - 220)
+    tw = d.textlength(texto, font=f)
+    _rgba(img, [W // 2 - tw / 2 - 40, y, W // 2 + tw / 2 + 40, y + alto], alto // 2, (255, 255, 255, 34), borde=AZUL, grosor=3)
+    center(d, y + (alto - f.size) / 2 - 8, texto, f, fill=WHITE)
+    return y + alto
+
+
+def _tarjeta_jugador(img, d, x, y, w, h, dorsal, nom, pos=None):
     _rgba(img, [x, y, x + w, y + h], h // 2, (255, 255, 255, 30), borde=(255, 255, 255, 46), grosor=1)
     r = h // 2 - 4
     cx, cy = x + h // 2, y + h // 2
@@ -265,54 +309,29 @@ def _tarjeta_jugador(img, d, x, y, w, h, dorsal, nom):
         fd = fit(d, str(dorsal), h * 0.44, r * 1.7, 14)
         tw = d.textlength(str(dorsal), font=fd)
         d.text((cx - tw / 2, cy - fd.size * 0.70), str(dorsal), font=fd, fill=NAVY)
-    fn = fit(d, nom, max(24, h * 0.50), w - h - 24, 18)
+    extra = 0
+    if pos:
+        fp = font(max(16, h * 0.30))
+        extra = d.textlength(pos, font=fp) + 22
+        d.text((x + w - extra + 6, cy - fp.size * 0.70), pos, font=fp, fill=AZUL)
+    fn = fit(d, nom, max(24, h * 0.50), w - h - 24 - extra, 18)
     d.text((x + h + 8, cy - fn.size * 0.70), nom, font=fn, fill=WHITE)
 
 
 def convocatoria(datos):
     img = fondo(); d = ImageDraw.Draw(img)
-    tag = {"CELTA FORTUNA": "CELTA FORTUNA"}.get(datos.get("tag"), "REAL CLUB CELTA DE VIGO")
-    # --- cabecera: competición, título y filete con rombo
-    logo = datos.get("logo")
-    if logo in LOGOS:
-        pegar(img, os.path.join(ASSETS, "marca", LOGOS[logo]), W // 2 - 42, 118, (84, 84))
-        yt = 212
-    else:
-        yt = 150
-    center(d, yt, "CONVOCATORIA", fit(d, "CONVOCATORIA", 100, W - 90))
-    center(d, yt + 116, tag, font(36), fill=AZUL)
-    yl = yt + 176
-    d.line([(150, yl), (W // 2 - 26, yl)], fill=AZUL, width=3)
-    d.line([(W // 2 + 26, yl), (W - 150, yl)], fill=AZUL, width=3)
-    _rombo(d, W // 2, yl, 9, AZUL)
-    # --- el partido: escudos de los dos equipos con VS en medio
+    yl = _cabecera_v33(img, d, "CONVOCATORIA", _tag_v33(datos), datos.get("logo"))
     cy = yl + 128
-    for lado, cx in (("local", 270), ("visitante", 810)):
-        _escudo_redondo(img, cx, cy, datos[lado], siglas(nombre(datos, lado)), r=98)
-        n = nombre(datos, lado)
-        pal = n.split()
-        lineas = [n]
-        if d.textlength(n, font=font(36)) > 420 and len(pal) > 1:
-            k = min(range(1, len(pal)), key=lambda i: abs(len(" ".join(pal[:i])) - len(" ".join(pal[i:]))))
-            lineas = [" ".join(pal[:k]), " ".join(pal[k:])]
-        for i, l in enumerate(lineas):
-            center(d, cy + 118 + i * 44, l, fit(d, l, 36, 420), x=cx)
-    center(d, cy - 38, "VS", font(64), fill=AZUL)
-    # --- fecha, hora y estadio
+    yp = _bloque_partido(img, d, datos, cy) + 40
     dia, hora = fecha_larga(datos.get("fecha_hora"))
-    yp = cy + 118 + 44 + 52
     linea = " · ".join(x for x in (dia, f"{hora} h" if hora else None) if x)
     if linea:
-        f = fit(d, linea, 44, W - 220)
-        tw = d.textlength(linea, font=f)
-        _rgba(img, [W // 2 - tw / 2 - 40, yp, W // 2 + tw / 2 + 40, yp + 78], 39, (255, 255, 255, 34), borde=AZUL, grosor=3)
-        center(d, yp + 14, linea, f, fill=WHITE)
-        yp += 78
+        yp = _pildora_fecha(img, d, yp, linea)
     if datos.get("lugar"):
         center(d, yp + 16, datos["lugar"], fit(d, datos["lugar"], 32, W - 140), fill=(200, 218, 240))
         yp += 56
-    # --- bajas (se calculan antes para reservar su sitio)
-    bajas = datos.get("bajas", [])
+    # bajas (se calculan antes para reservar su sitio)
+    bajas = [b if isinstance(b, dict) else {"nombre": b} for b in datos.get("bajas", [])]
     lineas_b, alto_b = [], 0
     if bajas:
         f = font(30)
@@ -325,12 +344,11 @@ def convocatoria(datos):
                 act = prueba
         lineas_b.append(act)
         alto_b = 58 + 38 * len(lineas_b)
-    # --- lista de convocados en tarjetas de dos columnas
-    y0 = yp + 36
-    fin = 1590 - (alto_b + 16 if bajas else 0)
-    conv = datos["convocados"]
+    y0 = yp + 28
+    fin = 1560 - (alto_b + 16 if bajas else 0)
+    conv = [j if isinstance(j, dict) else {"nombre": j} for j in datos["convocados"]]
     filas = (len(conv) + 1) // 2
-    ph = max(38, min(72, (fin - y0 - 26) // max(filas, 1) - 10))
+    ph = max(36, min(72, (fin - y0 - 26) // max(filas, 1) - 10))
     alto = filas * (ph + 10) + 22
     _rgba(img, [40, y0 - 12, W - 40, y0 - 12 + alto], 30, (4, 12, 30, 105))
     for i, j in enumerate(conv):
@@ -342,32 +360,171 @@ def convocatoria(datos):
         d.text((70, y + 12), "BAIXAS", font=font(26), fill=(255, 190, 196))
         for i, l in enumerate(lineas_b):
             d.text((70, y + 52 + i * 38), l, font=font(30), fill=(255, 232, 234))
-    # --- pie compacto
-    pegar(img, os.path.join(ASSETS, "marca", "escudo_marexada.png"), W // 2 - 55, 1630, (110, 110))
-    center(d, 1750, "MAREXADA CELESTE", font(42))
-    center(d, 1806, "marexadaceleste.com", font(30), fill=AZUL)
+    _pie_v33(img, d)
     return img
 
 
 def alineacion(datos):
     img = fondo(); d = ImageDraw.Draw(img)
-    center(d, 150, "ALIÑACIÓN", font(96))
-    center(d, 270, etiqueta_equipo(datos), font(44), fill=AZUL)
-    rival = nombre(datos, "visitante" if datos["local"] == "celta-vigo" else "local")
-    center(d, 340, f"vs {rival}", fit(d, f"vs {rival}", 62, W - 100))
+    yl = _cabecera_v33(img, d, "ALIÑACIÓN", _tag_v33(datos), datos.get("logo"))
+    yp = _bloque_partido(img, d, datos, yl + 128) + 40
     dia, hora = fecha_larga(datos.get("fecha_hora"))
-    linea = " · ".join(x for x in (dia, hora) if x)
+    linea = " · ".join(x for x in (dia, f"{hora} h" if hora else None) if x)
     if linea:
-        center(d, 425, linea, fit(d, linea, 44, W - 100), fill=AZUL)
+        yp = _pildora_fecha(img, d, yp, linea)
+    if datos.get("lugar"):
+        center(d, yp + 16, datos["lugar"], fit(d, datos["lugar"], 32, W - 140), fill=(200, 218, 240))
+        yp += 56
     once = [j if isinstance(j, dict) else {"nombre": j} for j in datos["once"]]
-    y = lista_pildoras(img, d, once, 520, 560)
     sup = [j if isinstance(j, dict) else {"nombre": j} for j in datos.get("suplentes", [])]
+    f1, f2 = (len(once) + 1) // 2, (len(sup) + 1) // 2
+    y0 = yp + 28
+    libre = 1560 - y0 - 22 - (60 + 22 if sup else 0)
+    ph = max(38, min(74, libre // max(f1 + f2, 1) - 10))
+    alto1 = f1 * (ph + 10) + 22
+    _rgba(img, [40, y0 - 12, W - 40, y0 - 12 + alto1], 30, (4, 12, 30, 105))
+    for i, j in enumerate(once):
+        col, fila = divmod(i, f1)
+        _tarjeta_jugador(img, d, 62 + col * 489, y0 + fila * (ph + 10), 467, ph, j.get("dorsal"), j["nombre"], j.get("pos"))
     if sup:
-        d.text((70, y + 20), "SUPLENTES", font=font(30), fill=AZUL)
-        lista_pildoras(img, d, sup, y + 64, 1530 - (y + 64))
-    pie(img, d)
+        ys = y0 - 12 + alto1 + 14
+        d.text((70, ys + 8), "SUPLENTES", font=font(28), fill=AZUL)
+        ys += 56
+        alto2 = f2 * (ph + 10) + 22
+        _rgba(img, [40, ys - 12, W - 40, ys - 12 + alto2], 30, (4, 12, 30, 80))
+        for i, j in enumerate(sup):
+            col, fila = divmod(i, f2)
+            _tarjeta_jugador(img, d, 62 + col * 489, ys + fila * (ph + 10), 467, ph, j.get("dorsal"), j["nombre"], j.get("pos"))
+    _pie_v33(img, d)
     return img
 
+
+def proximo(datos):
+    img = fondo(); d = ImageDraw.Draw(img)
+    yl = _cabecera_v33(img, d, "PRÓXIMO PARTIDO", _tag_v33(datos), datos.get("logo"))
+    cy = yl + 168
+    fin = _bloque_partido(img, d, datos, cy, r=118, tam=38)
+    dia, hora = fecha_larga(datos.get("fecha_hora"))
+    j = (datos.get("jornada") or "").strip()
+    j = "" if re.search(r"\bX$", j) else j
+    lugar = datos.get("lugar")
+    alto = 34 + (86 if dia else 0) + (216 if hora else 0) + (62 if lugar else 0) + (70 if j else 0) + 26
+    y0 = fin + 60
+    y0 += max(0, min(120, (1590 - (y0 + alto)) // 2))           # reparte el hueco que sobra
+    _rgba(img, [60, y0, W - 60, y0 + alto], 36, (4, 12, 30, 105), borde=(255, 255, 255, 40), grosor=2)
+    y = y0 + 34
+    if dia:
+        center(d, y, dia, fit(d, dia, 58, W - 160))
+        y += 86
+    if hora:
+        center(d, y, f"{hora} h", fit(d, f"{hora} h", 190, W - 160), fill=AZUL)
+        y += 216
+    if lugar:
+        center(d, y, lugar, fit(d, lugar, 40, W - 160), fill=(200, 218, 240))
+        y += 62
+    if j:
+        _pildora_fecha(img, d, y + 4, j, tam=34, alto=56)
+    _pie_v33(img, d)
+    return img
+
+
+# ---------------------------------------------------------------- resultado (cartel)
+def _balon(d, cx, cy, r=15):
+    """Pequeño icono de balón."""
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=WHITE, outline=(20, 30, 50), width=2)
+    pent = [(cx + r * 0.42 * math.cos(math.radians(a)), cy + r * 0.42 * math.sin(math.radians(a))) for a in range(-90, 270, 72)]
+    d.polygon(pent, fill=(20, 30, 50))
+    for (px, py) in pent:
+        k = r / (r * 0.42)
+        d.line([(px, py), (cx + (px - cx) * k * 0.92, cy + (py - cy) * k * 0.92)], fill=(20, 30, 50), width=2)
+
+
+def _agrupar_goles(lista):
+    """["Besfort Zeneli 35'", "Besfort Zeneli 49'"] -> [("Besfort Zeneli", ["35'", "49'"])] (mismo jugador junto, en orden)."""
+    out = []
+    for g in lista:
+        m = re.match(r"^(.*?)\s+([\d+]+'?)\s*$", g.strip())
+        nom, mi = (m.group(1), m.group(2) if m.group(2).endswith("'") else m.group(2) + "'") if m else (g.strip(), "")
+        for e in out:
+            if e[0] == nom:
+                if mi:
+                    e[1].append(mi)
+                break
+        else:
+            out.append((nom, [mi] if mi else []))
+    return out
+
+
+def _resultado(datos, hg=0):
+    img = fondo(); d = ImageDraw.Draw(img)
+    yl = _cabecera_v33(img, d, "RESULTADO FINAL", _tag_v33(datos), datos.get("logo"))
+    gl = _agrupar_goles(datos.get("goleadores_local", []))
+    gv = _agrupar_goles(datos.get("goleadores_visitante", []))
+    hay = bool(gl or gv)
+    r, cxs = (100, (270, 810)) if hay else (118, (270, 810))
+    cy = yl + (135 if hay else 150)
+    fin = _bloque_partido(img, d, datos, cy, r=r, centro=None, cx=cxs, tam=36)
+    # --- marcador enorme, como un cartel, centrado bajo los escudos
+    a, b = str(datos["goles_local"]), str(datos["goles_visitante"])
+    tam = 310 if hay else 400
+    hueco = 52
+    while tam > 100:
+        f = font(tam)
+        total = d.textlength(a, font=f) + d.textlength(b, font=f) + 2 * hueco + 70
+        if total <= W - 120:
+            break
+        tam -= 6
+    f = font(tam)
+    bb = d.textbbox((0, 0), "8", font=f)
+    alto_num = bb[3] - bb[1]
+    cs = fin + 50 + hg + alto_num / 2                       # centro vertical del marcador
+    ytxt = cs - (bb[1] + alto_num / 2)
+    wa = d.textlength(a, font=f)
+    x0 = W / 2 - total / 2
+    d.text((x0, ytxt), a, font=f, fill=WHITE)
+    d.rounded_rectangle([x0 + wa + hueco, cs - 9, x0 + wa + hueco + 70, cs + 9], 9, fill=AZUL)
+    d.text((x0 + wa + 2 * hueco + 70, ytxt), b, font=f, fill=WHITE)
+    fin = cs + alto_num / 2 + 6
+    # --- fecha / jornada / estadio
+    dia, _ = fecha_larga(datos.get("fecha_hora"))
+    j = (datos.get("jornada") or "").strip()
+    j = "" if re.search(r"\bX$", j) else j
+    linea = " · ".join(x for x in (j, dia) if x)
+    yp = fin + 44 + hg
+    if linea:
+        yp = _pildora_fecha(img, d, yp, linea, tam=38, alto=70)
+    if datos.get("lugar"):
+        center(d, yp + 14, datos["lugar"], fit(d, datos["lugar"], 30, W - 140), fill=(200, 218, 240))
+        yp += 52
+    # --- goleadores con balón y minuto
+    if hay:
+        filas = max(len(gl), len(gv))
+        y0 = yp + 40 + hg
+        rh = max(50, min(68, (1590 - y0 - 100) // max(filas, 1)))
+        alto = 78 + filas * rh + 16
+        _rgba(img, [40, y0, W - 40, y0 + alto], 30, (4, 12, 30, 115))
+        center(d, y0 + 16, "GOLEADORES", font(28), fill=AZUL)
+        d.line([(W // 2, y0 + 70), (W // 2, y0 + alto - 20)], fill=(255, 255, 255, 60), width=2)
+        for lista, x in ((gl, 70), (gv, 570)):  # columnas de 440 px
+            for i, (nom, mins) in enumerate(lista[:7]):
+                yy = y0 + 78 + i * rh + rh // 2
+                _balon(d, x + 18, yy, 16)
+                txt_m = " · ".join(mins)
+                fm = font(30)
+                wm = d.textlength(txt_m, font=fm)
+                d.text((x + 440 - wm, yy - fm.size * 0.70), txt_m, font=fm, fill=AZUL)
+                fn = fit(d, nom, 34, 440 - 48 - wm - 24, 20)
+                d.text((x + 48, yy - fn.size * 0.70), nom, font=fn, fill=WHITE)
+        yp = y0 + alto
+    _pie_v33(img, d)
+    return img, yp
+
+
+def resultado(datos):
+    """Primero se dibuja normal para ver cuánto sitio sobra y luego se reparte ese hueco entre los bloques."""
+    _, fin = _resultado(datos, 0)
+    hg = max(0, min(70, (1560 - fin) / 3))
+    return _resultado(datos, hg)[0]
 
 
 def escudo_mini(img, cx, cy, slug, siglas_txt, r=30):

@@ -3,27 +3,33 @@
  "partidos": [
   {
    "equipo": "as_celtas_fem",
-   "fecha": "2026-11-14"
+   "fecha": "2026-11-14",
+   "hora": null
   },
   {
    "equipo": "as_celtas_fem",
-   "fecha": "2026-11-22"
+   "fecha": "2026-11-22",
+   "hora": null
   },
   {
    "equipo": "celta",
-   "fecha": "2026-11-13"
+   "fecha": "2026-11-13",
+   "hora": null
   },
   {
    "equipo": "celta",
-   "fecha": "2026-11-21"
+   "fecha": "2026-11-21",
+   "hora": "21:00"
   },
   {
    "equipo": "fortuna",
-   "fecha": "2026-11-07"
+   "fecha": "2026-11-07",
+   "hora": null
   },
   {
    "equipo": "fortuna",
-   "fecha": "2026-11-16"
+   "fecha": "2026-11-16",
+   "hora": "20:30"
   }
  ]
 }

@@ -79,8 +79,16 @@ def usar_tema(logo=None):
     NAVY, AZUL = t["navy"], t["acento"]
 
 
+# v52: un fondo distinto según el tipo de historia (la misma capa azul y el mismo pie, solo cambia la foto). Sin foto, se usa la grada de siempre.
+FONDO_POR_TIPO = {"convocatoria": "fondo_vestuario.jpg", "alineacion": "fondo_vestuario.jpg",
+                  "partemedico": "fondo_ciudad_deportiva.jpg", "clasificacion": "fondo_mural_balaidos.jpg"}
+_TIPO_FONDO = None
+
+
 def fondo():
-    ruta = os.path.join(ASSETS, "fondos", "historia.jpg")
+    ruta = os.path.join(ASSETS, "fondos", FONDO_POR_TIPO.get(_TIPO_FONDO, ""))
+    if not os.path.isfile(ruta):
+        ruta = os.path.join(ASSETS, "fondos", "historia.jpg")
     if not os.path.exists(ruta):
         ruta = os.path.join(ASSETS, "fondos", "historia_provisional.jpg")
     img = Image.open(ruta).convert("RGB").resize((W, H), Image.LANCZOS)

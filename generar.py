@@ -279,6 +279,7 @@ def generar(ruta_json, salida=None):
     datos = json.load(open(ruta_json, encoding="utf-8"))
     T = THEMES[datos.get("competicion", "liga")]
     HISTORIA.usar_tema(datos.get("logo"))
+    HISTORIA._TIPO_FONDO = datos.get("tipo")
     if datos["tipo"] in HISTORIA.RENDER:
         img = HISTORIA.RENDER[datos["tipo"]](datos)  # TODO sale como historia 1080x1920 (también Europa League)
     else:

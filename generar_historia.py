@@ -110,9 +110,7 @@ def cabecera(img, d, tag, titulo, logo=None, ytitulo=205, ytag=150):
 
 
 def pie(img, d):
-    pegar(img, os.path.join(ASSETS, "marca", "escudo_marexada.png"), 458, 1584, (164, 164))
-    center(d, 1762, "MAREXADA CELESTE", font(48))
-    center(d, 1826, "marexadaceleste.com", font(34), fill=AZUL)
+    _pie_marca(img, d, 1590)
 
 
 def escudo(img, cx, cy, slug, siglas):
@@ -337,7 +335,8 @@ def _agrupar_goles(lista):
 
 
 
-FIN_CONTENIDO = 1466        # el pie (escudo de la peña + web) ocupa de 1484 a 1690, dentro de la zona segura
+PIE_Y = 1466                # el pie (escudos de la peña + web) ocupa de 1466 a 1690, dentro de la zona segura
+FIN_CONTENIDO = PIE_Y - 18
 
 
 def _filete(d, yl, color=None):
@@ -372,11 +371,73 @@ def _cab_logo(img, d, titulo, tag, logo, s):
     return yl
 
 
+def _logo_texto(img, x, y, ancho):
+    """Segundo logo de la peña (MAREXADA CELESTE con el escudo rojo), con una sombra suave para que se lea sobre la foto."""
+    wm = Image.open(os.path.join(ASSETS, "marca", "logo_marexada_texto.png")).convert("RGBA")
+    alto = int(wm.height * ancho / wm.width)
+    wm = wm.resize((ancho, alto), Image.LANCZOS)
+    sombra = Image.new("RGBA", (ancho + 60, alto + 60), (0, 0, 0, 0))
+    sombra.paste((0, 0, 0, 170), (30, 36), wm.getchannel("A"))
+    sombra = sombra.filter(ImageFilter.GaussianBlur(9))
+    img.paste(sombra, (x - 30, y - 30), sombra)
+    img.paste(wm, (x, y), wm)
+    return alto
+
+
+# Pie de marca: escudo azul + letras (más pequeñas) + escudo rojo centrado con las letras.
+# Todos se reducen UNA sola vez desde el original grande (sin pasos intermedios) para no perder calidad.
+LOGO_PIE = "alternar"       # "alternar" = cada historia cambia: escudo azul + letras / letras + escudo rojo (nunca los dos) | "azul" | "rojo" | "ambos"
+_PIE_N = 0                  # cuenta las historias generadas para ir alternando
+
+
+def _sombra_logo(img, im, x, y, desenfoque=9, alpha=170):
+    sombra = Image.new("RGBA", (im.width + 60, im.height + 60), (0, 0, 0, 0))
+    sombra.paste((0, 0, 0, alpha), (30, 34), im.getchannel("A"))
+    sombra = sombra.filter(ImageFilter.GaussianBlur(desenfoque))
+    img.paste(sombra, (x - 30, y - 30), sombra)
+    img.paste(im, (x, y), im)
+
+
+def _cargar_marca(nombre, alto=None, ancho=None):
+    im = Image.open(os.path.join(ASSETS, "marca", nombre)).convert("RGBA")
+    if alto:
+        ancho = round(im.width * alto / im.height)
+    else:
+        alto = round(im.height * ancho / im.width)
+    return im.resize((ancho, alto), Image.LANCZOS)
+
+
+def _pie_marca(img, d, y):
+    """Escudo azul de la peña | MAREXADA CELESTE | escudo rojo, todo en la misma fila y centrado
+    verticalmente. La web va debajo. Devuelve la y donde termina."""
+    global _PIE_N
+    modo = LOGO_PIE
+    if modo == "alternar":
+        modo = "azul" if (datetime.date.today().toordinal() + _PIE_N) % 2 == 0 else "rojo"
+        _PIE_N += 1
+    azul = _cargar_marca("escudo_marexada.png", alto=192) if modo in ("ambos", "azul") else None
+    rojo = _cargar_marca("logo_marexada_rojo.png", alto=178) if modo in ("ambos", "rojo") else None
+    letras = _cargar_marca("logo_marexada_letras.png", ancho=430)
+    gap = 26
+    piezas = [p for p in (azul, letras, rojo) if p is not None]
+    total = sum(p.width for p in piezas) + gap * (len(piezas) - 1)
+    fila = max(192, max(p.height for p in piezas))     # misma altura de fila en las dos versiones
+    cy = y + fila // 2                      # eje horizontal común: el rojo queda centrado con las letras
+    x = (W - total) // 2
+    for p in piezas:
+        py = cy - p.height // 2
+        if p is azul:
+            _sombra_logo(img, p, x, py, 10, 140)
+        else:
+            _sombra_logo(img, p, x, py)
+        x += p.width + gap
+    center(d, y + fila + 8, "marexadaceleste.com", font(30), fill=AZUL)
+    return y + fila + 8 + 40
+
+
 def _pie_v39(img, d):
-    """Escudo de la peña grande con la web debajo, abajo del todo pero dentro de la zona segura."""
-    lado, y = 150, 1484
-    _escudo_pena(img, W // 2, y, lado)
-    center(d, y + lado + 4, "marexadaceleste.com", font(34), fill=AZUL)
+    """Pie de las historias de partido, dentro de la zona segura."""
+    _pie_marca(img, d, PIE_Y)
 
 
 def _bloque_centro_logo(img, d, datos, cy, r, tam, s):

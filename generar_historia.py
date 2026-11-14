@@ -600,7 +600,7 @@ def proximo(datos):
 
 def _resultado(datos, s, hg=0):
     img = fondo(); d = ImageDraw.Draw(img)
-    yl = _cab_logo(img, d, "RESULTADO FINAL", _tag_v33(datos), datos.get("logo"), s)
+    yl = _cab_logo(img, d, datos.get("titulo") or "RESULTADO FINAL", _tag_v33(datos), datos.get("logo"), s)
     gl = _agrupar_goles(datos.get("goleadores_local", []))
     gv = _agrupar_goles(datos.get("goleadores_visitante", []))
     hay = bool(gl or gv)

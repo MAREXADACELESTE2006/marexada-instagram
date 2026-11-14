@@ -31,8 +31,8 @@ sys.path.insert(0, BASE)
 MADRID = ZoneInfo("Europe/Madrid")
 ESTADO = os.path.join(BASE, "estado", "publicado.json")
 AGENDA = os.path.join(BASE, "estado", "agenda.json")           # fechas de los partidos cercanos (la usa el modo rápido para saber si hay algo que vigilar)
-RAPIDAS = {"calendario.py", "noticias.py", "resultados.py", "futbolme.py", "besoccer.py"}     # fuentes del modo rápido: convocatorias y resultados
-CLAVES_RAPIDAS = ("convocatoria-", "cronica-", "resultado-")
+RAPIDAS = {"calendario.py", "noticias.py", "resultados.py", "futbolme.py", "besoccer.py", "directo.py"}     # fuentes del modo rápido: convocatorias y resultados
+CLAVES_RAPIDAS = ("convocatoria-", "cronica-", "resultado-", "inicio-", "descanso-")
 HASHTAGS = "#RCCelta #Celta #MarexadaCeleste"
 
 RECORDATORIOS = {
@@ -90,15 +90,31 @@ def hay_partido_cerca(hoy):
 def guardar_agenda(datos, hoy):
     """Recuerda las fechas de los próximos partidos y de los últimos resultados (3 días atrás) para que el modo rápido sepa cuándo vigilar."""
     viejas = (cargar(AGENDA) or {}).get("partidos", [])
-    nuevas = {(p["equipo"], p["fecha"]) for p in viejas if p.get("fecha") and (hoy - datetime.date.fromisoformat(p["fecha"])).days <= 3}
+    nuevas = {(p["equipo"], p["fecha"]): p.get("hora") for p in viejas if p.get("fecha") and (hoy - datetime.date.fromisoformat(p["fecha"])).days <= 3}
     for nombre in ("celta", "fortuna", "as_celtas_fem"):
         for pref in ("proximo", "resultado"):
-            f = fecha_de(datos.get(f"{pref}_{nombre}.json"))
+            d = datos.get(f"{pref}_{nombre}.json")
+            f = fecha_de(d)
             if f:
-                nuevas.add((nombre, f.isoformat()))
+                h = re.search(r"(\d{1,2}:\d{2})", (d or {}).get("fecha_hora") or "") if pref == "proximo" else None
+                clave = (nombre, f.isoformat())
+                nuevas[clave] = h.group(1) if h else nuevas.get(clave)          # v50: se recuerda la hora de inicio para no dar «final» antes de tiempo
     os.makedirs(os.path.dirname(AGENDA), exist_ok=True)
-    json.dump({"actualizada": hoy.isoformat(), "partidos": [{"equipo": e, "fecha": f} for e, f in sorted(nuevas)]},
+    json.dump({"actualizada": hoy.isoformat(), "partidos": [{"equipo": e, "fecha": f, "hora": h} for (e, f), h in sorted(nuevas.items())]},
               open(AGENDA, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+
+
+def partido_acabado(nombre, f):
+    """v50: ¿puede haber terminado ya el partido? Si es de hoy y conocemos la hora de inicio, no se da por terminado hasta 115 min después
+    (así un marcador en directo, p. ej. 0-0 al empezar, nunca sale como «RESULTADO FINAL»). Sin hora conocida, se asume que sí."""
+    ahora = datetime.datetime.now(MADRID)
+    if f != ahora.date():
+        return True
+    for p in (cargar(AGENDA) or {}).get("partidos", []):
+        if p.get("equipo") == nombre.replace("-", "_") and p.get("fecha") == f.isoformat() and p.get("hora"):
+            hh, mm = (int(x) for x in p["hora"].split(":"))
+            return ahora >= ahora.replace(hour=hh, minute=mm, second=0, microsecond=0) + datetime.timedelta(minutes=115)
+    return True
 
 
 def fecha_partido(c, hoy):
@@ -257,12 +273,23 @@ def plan(hoy, datos, avisos):
         r = datos.get(fichero)
         f = fecha_de(r)
         if not r or not f or not (0 <= (hoy - f).days <= 1) or nombre in con_cronica:
-            continue                                   # si ya hay crónica (con goleadores) no se saca la del marcador
+            continue
+        if nombre == "as-celtas-fem" and not partido_acabado(nombre, f):
+            continue                                   # marcador en directo, todavía no es el final                                   # si ya hay crónica (con goleadores) no se saca la del marcador
         cierre = "Orgullosas do AS Celtas!" if nombre == "as-celtas-fem" else "Forza Celta!"
         con_gol = bool(r.get("goleadores_local") or r.get("goleadores_visitante"))     # v42: si más tarde aparecen los goleadores, sale otra historia (clave distinta) para sustituir la primera
         aviso_gol = " (Versión con goleadores: se xa subiches a do marcador, substitúea.)" if con_gol else ""
         add(f"resultado-{nombre}-{r['fecha_hora']}-{r['goles_local']}-{r['goles_visitante']}" + ("-g" if con_gol else ""), fichero, "resultado", "xusto ao rematar o partido",
             f"Final: {nombre_lado(r, 'local')} {r['goles_local']} - {r['goles_visitante']} {nombre_lado(r, 'visitante')}. {cierre} 💙 {etiquetas(nombre)}{aviso_gol}")
+
+    dv = datos.get("directo_celta_inicio.json")                   # v50: Celta en directo (solo el primer equipo): inicio y descanso
+    if dv:
+        add(f"inicio-celta-{dv['_fecha']}-{dv['_id']}", "directo_celta_inicio.json", "resultado", "xusto ao comezar o partido",
+            f"Comeza o partido! {nombre_lado(dv, 'local')} - {nombre_lado(dv, 'visitante')}. Forza Celta! 💙 {HASHTAGS}")
+    dd = datos.get("directo_celta_descanso.json")
+    if dd:
+        add(f"descanso-celta-{dd['_fecha']}-{dd['_id']}", "directo_celta_descanso.json", "resultado", "no descanso",
+            f"Descanso! {nombre_lado(dd, 'local')} {dd['goles_local']} - {dd['goles_visitante']} {nombre_lado(dd, 'visitante')}. Forza Celta! 💙 {HASHTAGS}")
 
     tabla = {0: ("clasificacion_celta_laliga.json", "laliga", "LaLiga"), 1: ("clasificacion_celta_fortuna.json", "fortuna", "LaLiga Hypermotion (Celta Fortuna)"),
              3: ("clasificacion_as_celtas_fem.json", "as-celtas-fem", "Segunda Federación Femenina (AS Celtas)")}.get(wd)
@@ -382,6 +409,7 @@ def main():
             ("clasificaciones.py", ["--salida", d_datos], "Clasificaciones"),
             ("noticias.py", ["--salida", d_datos], "Noticias rccelta.es"),
             ("resultados.py", ["--ahora", ahora, "--salida", d_datos], "Resultados Celta/Fortuna"),
+            ("directo.py", ["--salida", d_datos], "Celta en directo"),
             ("futbolme.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "AS Celtas Fem (futbolme)"),
             ("partemedico.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Parte médico (rccelta.es)"),
             ("entradas.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Entradas (rccelta.es)"),

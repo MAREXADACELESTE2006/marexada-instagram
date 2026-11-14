@@ -197,7 +197,8 @@ def leer_partidos(html, hoy, nombres):
             gl, gv = int(ms.group(1)), int(ms.group(2))
         salida.append({"id": m.group(3), "local": m.group(1), "visitante": m.group(2), "fecha": f,
                        "hora": hora.group(1) if hora else None, "competicion": competicion, "etapa": etapa,
-                       "goles_local": gl, "goles_visitante": gv, "penaltis": pen, "jugado": gl is not None})
+                       "goles_local": gl, "goles_visitante": gv, "penaltis": pen,
+                       "jugado": gl is not None and bool(re.match(r"\s*FIN\b", t))})   # v50: besoccer enseña el marcador EN DIRECTO sin «FIN»; solo cuenta como jugado si pone FIN
     if not salida:
         raise ErrorLector("No encuentro ningún partido del AS Celtas Fem en la página (¿ha cambiado besoccer?).")
     return sorted(salida, key=lambda x: x["fecha"])

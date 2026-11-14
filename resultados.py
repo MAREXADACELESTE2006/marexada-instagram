@@ -46,6 +46,41 @@ def num(x):
         return None
 
 
+def _min(m):
+    """"45'+2'" -> "45+2'" """
+    return re.sub(r"'\s*\+\s*(\d+)'?", r"+\1'", (m or "").strip())
+
+
+def goles_espn(c, h):
+    """Goleadores del propio ESPN (competitions[0].details) si vienen; si no, listas vacías. Nunca rompe."""
+    gl, gv = [], []
+    try:
+        hid = str((h.get("team") or {}).get("id", ""))
+        for dt in c.get("details") or []:
+            if not dt.get("scoringPlay"):
+                continue
+            ath = (dt.get("athletesInvolved") or [{}])[0]
+            nom = ath.get("displayName") or ath.get("shortName") or ""
+            if not nom:
+                continue
+            extra = " (p.p.)" if dt.get("ownGoal") else " (p.)" if dt.get("penaltyKick") else ""
+            txt = f"{nom}{extra} {_min((dt.get('clock') or {}).get('displayValue'))}".strip()
+            (gl if str((dt.get("team") or {}).get("id", "")) == hid else gv).append(txt)
+    except Exception:
+        return [], []
+    return gl, gv
+
+
+def goles_sdb(texto):
+    """TheSportsDB: "16':Ferran Jutglà;24':Ferran Jutglà;" -> ["Ferran Jutglà 16'", ...]"""
+    out = []
+    for parte in (texto or "").split(";"):
+        m = re.match(r"\s*(\d+(?:\+\d+)?)'?\s*:?\s*(.+?)\s*$", parte)
+        if m:
+            out.append(f"{m.group(2)} {m.group(1)}'")
+    return out
+
+
 def de_espn(ev, k):
     c = (ev.get("competitions") or [{}])[0]
     h = a = None
@@ -65,7 +100,8 @@ def de_espn(ev, k):
         f = datetime.datetime.fromisoformat((ev.get("date") or c.get("date")).replace("Z", "+00:00"))
     except (AttributeError, ValueError):
         return None
-    return {"f": f, "k": k, "home": nm(h), "away": nm(a), "gl": gl, "gv": gv}
+    g1, g2 = goles_espn(c, h)
+    return {"f": f, "k": k, "home": nm(h), "away": nm(a), "gl": gl, "gv": gv, "gol_l": g1, "gol_v": g2, "id": ev.get("id") or c.get("id")}
 
 
 def de_sdb(ev, k):
@@ -79,7 +115,8 @@ def de_sdb(ev, k):
         f = datetime.datetime.fromisoformat(iso.replace("Z", "+00:00"))
     except ValueError:
         return None
-    return {"f": f, "k": k, "home": ev.get("strHomeTeam") or "", "away": ev.get("strAwayTeam") or "", "gl": gl, "gv": gv}
+    return {"f": f, "k": k, "home": ev.get("strHomeTeam") or "", "away": ev.get("strAwayTeam") or "", "gl": gl, "gv": gv,
+            "gol_l": goles_sdb(ev.get("strHomeGoalDetails")), "gol_v": goles_sdb(ev.get("strAwayGoalDetails")), "sid": ev.get("idEvent")}
 
 
 def temporada_espn():
@@ -99,7 +136,7 @@ def fuentes_en_vivo():
             for sufijo in (f"teams/{id_}/schedule?season={y}", f"teams/{id_}/schedule"):
                 try:
                     evs = get(ESPN.format(liga) + sufijo).get("events") or []
-                    out[eq] += [p for p in (de_espn(e, k) for e in evs) if p and filtro(p)]
+                    out[eq] += [dict(p, liga=liga) for p in (de_espn(e, k) for e in evs) if p and filtro(p)]
                     break
                 except Exception as e:
                     errores.append(f"ESPN {liga} {eq}: {e}")
@@ -116,7 +153,69 @@ def fuentes_en_vivo():
                     out[eq].append(p)
         except Exception as e:
             errores.append(f"TheSportsDB {k}: {e}")
+    try:                                               # v38 respaldo: últimos partidos del Celta, de cualquier competición (Copa incluida)
+        for e in get(SDB + f"eventslast.php?id={CELTA_SDB}").get("results") or []:
+            lg = e.get("strLeague") or ""
+            k = "copa" if re.search(r"copa", lg, re.I) else "euro" if re.search(r"europa|uefa", lg, re.I) else "liga"
+            p = de_sdb(e, k)
+            if p and es_celta(p["home"] + p["away"]) and not es_fortuna(p["home"]) and not es_fortuna(p["away"]):
+                if not any(q["f"].date() == p["f"].date() and q["gl"] == p["gl"] and q["gv"] == p["gv"] for q in out["celta"]):
+                    out["celta"].append(p)
+    except Exception as e:
+        errores.append(f"TheSportsDB últimos del Celta: {e}")
     return out, errores
+
+
+def goles_resumen_espn(j, home_nombre):
+    """ESPN summary?event=ID -> keyEvents con los goles (nombre, minuto, equipo). Nunca rompe."""
+    gl, gv = [], []
+    try:
+        hid = ""
+        for t in (((j.get("header") or {}).get("competitions") or [{}])[0].get("competitors") or []):
+            if t.get("homeAway") == "home":
+                hid = str((t.get("team") or {}).get("id", ""))
+        for ev in j.get("keyEvents") or []:
+            tipo = ((ev.get("type") or {}).get("text") or "")
+            if not (ev.get("scoringPlay") or re.search(r"goal|penalty - scored", tipo, re.I)):
+                continue
+            nom = ""
+            for pt in ev.get("participants") or []:
+                nom = (pt.get("athlete") or {}).get("displayName") or ""
+                if nom:
+                    break
+            if not nom:
+                nom = re.sub(r"\s+(Goal|Penalty.*)$", "", ev.get("shortText") or "").strip()
+            if not nom:
+                continue
+            extra = " (p.p.)" if re.search(r"own", tipo, re.I) else " (p.)" if re.search(r"penalty", tipo, re.I) else ""
+            tid = str((ev.get("team") or {}).get("id", ""))
+            es_local = (tid == hid) if (tid and hid) else ((ev.get("team") or {}).get("displayName") == home_nombre)
+            (gl if es_local else gv).append(f"{nom}{extra} {_min((ev.get('clock') or {}).get('displayValue'))}".strip())
+    except Exception:
+        return [], []
+    return gl, gv
+
+
+def completar_goles(p):
+    """Si el partido no trae goleadores, los busca en el detalle del partido (ESPN) y, si no, en TheSportsDB."""
+    if p.get("gol_l") or p.get("gol_v") or (p["gl"] + p["gv"]) == 0:
+        return
+    try:
+        if p.get("liga") and p.get("id"):
+            gl, gv = goles_resumen_espn(get(ESPN.format(p["liga"]) + f"summary?event={p['id']}"), p["home"])
+            if gl or gv:
+                p["gol_l"], p["gol_v"] = gl, gv
+                return
+    except Exception as e:
+        print("aviso: detalle ESPN sin goleadores:", e, file=sys.stderr)
+    try:
+        if p.get("sid"):
+            ev = (get(SDB + f"lookupevent.php?id={p['sid']}").get("events") or [{}])[0]
+            gl, gv = goles_sdb(ev.get("strHomeGoalDetails")), goles_sdb(ev.get("strAwayGoalDetails"))
+            if gl or gv:
+                p["gol_l"], p["gol_v"] = gl, gv
+    except Exception as e:
+        print("aviso: detalle TheSportsDB sin goleadores:", e, file=sys.stderr)
 
 
 def desde_archivo(ruta):
@@ -134,7 +233,7 @@ def datos(p, eq):
             "local": escudo(p["home"]), "visitante": escudo(p["away"]),
             "local_nombre": nombre(p["home"]), "visitante_nombre": nombre(p["away"]),
             "jornada": JORNADA.get(p["k"], ""), "goles_local": p["gl"], "goles_visitante": p["gv"],
-            "goleadores_local": [], "goleadores_visitante": [],
+            "goleadores_local": p.get("gol_l", []), "goleadores_visitante": p.get("gol_v", []),
             "fecha_hora": f"{DIA[f.weekday()]} {f.day:02d}/{f.month:02d}", "_fecha": f.date().isoformat()}
 
 
@@ -153,6 +252,8 @@ def main():
         if not jugados:
             print(f"aviso: sin partidos jugados del {eq}", file=sys.stderr)
             continue
+        if not a.desde:
+            completar_goles(jugados[-1])
         ruta = os.path.join(a.salida, f"resultado_{eq}.json")
         json.dump(datos(jugados[-1], eq), open(ruta, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
         print("escrito", ruta)

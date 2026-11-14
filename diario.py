@@ -437,11 +437,14 @@ def main():
         L.append("Hoy no hay historias automáticas nuevas.")
     L += ["", "## Contido propio que toca hoxe (aínda sen automatizar)"] + [f"- {r}" for r in RECORDATORIOS[hoy.weekday()]]
     L += ["- Aliñación do Celta e do Fortuna: non se xera (non fai falta)."]
+    L_tg = list(L)                                             # lo que llega a Telegram: sin el control de actualidad (ocupa mucho; sigue en resumen.md)
     if controles:
         L += ["", "## Control de actualidad"] + [f"- {x}" for x in controles]
     if avisos:
         L += ["", "## Avisos"] + [f"- {x}" for x in avisos]
+        L_tg += ["", "## Avisos"] + [f"- {x}" for x in avisos]
     resumen = "\n".join(L) + "\n"
+    resumen_tg = "\n".join(L_tg) + "\n"
     open(os.path.join(carpeta, "resumen.md"), "w", encoding="utf-8").write(resumen)
 
     # Telegram: avisa cuando hay historias nuevas o algún aviso (error). Además, el resumen del día (con el contenido propio que
@@ -453,7 +456,7 @@ def main():
     configurado = bool(os.environ.get("TELEGRAM_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID"))
     quiere_envio = bool(historias) if rapido else bool(historias or avisos or resumen_dia)     # modo rápido: solo avisa si hay historias (los avisos van en las ejecuciones completas)
     if not a.sin_telegram and not a.offline and quiere_envio:
-        enviado = telegram(historias, resumen, avisos, rapido)
+        enviado = telegram(historias, resumen_tg, avisos, rapido)
     # Si Telegram está configurado y el envío falla, no se anota nada: las historias y el resumen se reintentan en la siguiente ejecución.
     fallo_envio = configurado and quiere_envio and not enviado and not a.sin_telegram and not a.offline
     if not a.sin_estado and not a.offline and not fallo_envio:

@@ -8,8 +8,12 @@ on:
     - cron: "30 22 * * *"          # 23:30 / 00:30
     # --- Ejecuciones RÁPIDAS (solo convocatorias y resultados) ---
     - cron: "5,35 9-13 * * *"      # cada 30 min de 10:05 a 14:35 (invierno): para pillar la convocatoria cuando la publica el club
-    - cron: "5,35 14-22 * * 4-6,0,1"   # cada 30 min de 15:05 a 23:35 (invierno), de jueves a lunes: para sacar los resultados al acabar el partido
-  workflow_dispatch:               # botón "Run workflow" para probarlo a mano (hace una ejecución completa)
+    - cron: "5,35 14-23 * * *"         # cada 30 min de 15:05 a 00:35 (invierno), TODOS los días (también martes y miércoles, Copa): para sacar los resultados al acabar el partido
+  workflow_dispatch:               # botón "Run workflow" (a mano o desde un servicio externo): por defecto hace una ejecución completa
+    inputs:
+      modo:
+        description: "completo (todo) o rapido (solo convocatorias y resultados)"
+        default: "completo"
 
 permissions:
   contents: write                  # para guardar estado/publicado.json y estado/agenda.json en el repositorio
@@ -23,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      MODO: ${{ (github.event_name == 'workflow_dispatch' || contains(fromJSON('["0 6 * * *","30 16 * * *","30 22 * * *"]'), github.event.schedule)) && 'completo' || 'rapido' }}
+      MODO: ${{ github.event_name == 'workflow_dispatch' && (inputs.modo || 'completo') || (contains(fromJSON('["0 6 * * *","30 16 * * *","30 22 * * *"]'), github.event.schedule) && 'completo' || 'rapido') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

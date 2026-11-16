@@ -1,4 +1,4 @@
-"""Marexada Celeste · EN DIRECTO (v53).
+"""Marexada Celeste · EN DIRECTO (v56).
 
 Mira si el Celta (primer equipo) o el Celta Fortuna están jugando ahora mismo (ESPN: LaLiga, Europa League, Copa del Rey e Hypermotion).
 Escribe en datos_reales/ (o en la carpeta --salida):
@@ -73,21 +73,38 @@ def de_espn_directo(ev, k):
             "id": ev.get("id") or c.get("id"), "minuto": minuto, "estado": tipo.get("name", ""), "periodo": st.get("period")}
 
 
-def buscar_en_vivo():
-    """{'celta': [partidos en juego], 'fortuna': [...]} leyendo ESPN."""
+def _ids(ev):
+    return {str((t.get("team") or {}).get("id", "")) for t in ((ev.get("competitions") or [{}])[0].get("competitors") or [])}
+
+
+def buscar_en_vivo(registro=None):
+    """{'celta': [partidos en juego], 'fortuna': [...]} leyendo ESPN.
+    v56: la lista normal de partidos del equipo (/schedule) SOLO trae los ya terminados, así que un partido en juego no salía.
+    Se miran tres sitios: /schedule?fixture=true (próximos y en juego), el marcador de la liga (/scoreboard, con los partidos de hoy) y /schedule."""
+    registro = registro if registro is not None else []
     out = {eq: [] for eq in EQUIPOS}
     for eq, (id_, ligas) in EQUIPOS.items():
+        vistos = {}
         for liga, k in ligas:
-            try:
-                evs = R.get(R.ESPN.format(liga) + f"teams/{id_}/schedule").get("events") or []
-            except Exception as e:
-                print(f"aviso: ESPN {liga} ({eq}): {e}", file=sys.stderr)
-                continue
-            for e in evs:
-                p = de_espn_directo(e, k)
-                if p and es_del_equipo(eq, p):
-                    p["liga"] = liga
-                    out[eq].append(p)
+            base = R.ESPN.format(liga)
+            for etiqueta, url in (("fixture", base + f"teams/{id_}/schedule?fixture=true"), ("scoreboard", base + "scoreboard"), ("schedule", base + f"teams/{id_}/schedule")):
+                try:
+                    evs = R.get(url).get("events") or []
+                except Exception as e:
+                    registro.append(f"{eq} {liga} {etiqueta}: ERROR {type(e).__name__}: {e}")
+                    print(f"aviso: ESPN {liga} {etiqueta} ({eq}): {e}", file=sys.stderr)
+                    continue
+                suyos = [e for e in evs if id_ in _ids(e)]
+                estados = [((((e.get('competitions') or [{}])[0].get('status') or e.get('status') or {}).get('type') or {}).get('name') or '?') for e in suyos]
+                registro.append(f"{eq} {liga} {etiqueta}: {len(evs)} eventos, {len(suyos)} del equipo; estados: {', '.join(sorted(set(estados))) or '-'}")
+                for e in suyos:
+                    p = de_espn_directo(e, k)
+                    if p and es_del_equipo(eq, p):
+                        p["liga"] = liga
+                        previo = vistos.get(p["id"])
+                        if not previo or (len(p["gol_l"]) + len(p["gol_v"]) > len(previo["gol_l"]) + len(previo["gol_v"])):
+                            vistos[p["id"]] = p                 # si sale en varias fuentes, nos quedamos con la que trae más goles detallados
+        out[eq] = list(vistos.values())
     return out
 
 
@@ -229,11 +246,16 @@ def main():
     ap.add_argument("--salida", default=os.path.join(BASE, "datos_reales"))
     a = ap.parse_args()
     os.makedirs(a.salida, exist_ok=True)
+    registro = []
     try:
-        vivos = desde_archivo(a.desde) if a.desde else buscar_en_vivo()
+        vivos = desde_archivo(a.desde) if a.desde else buscar_en_vivo(registro)
     except Exception as e:
         print(f"aviso: directo sin datos ({e})", file=sys.stderr)
         return
+    finally:                                                       # v56: lo que ha visto ESPN en esta revisión, para poder comprobarlo en el artifact «historias»
+        if registro:
+            open(os.path.join(a.salida, "directo_log.txt"), "w", encoding="utf-8").write(
+                datetime.datetime.now(MADRID).strftime("%Y-%m-%d %H:%M Madrid") + "\n" + "\n".join(registro) + "\n")
     if not any(vivos.values()):
         print("Ni el Celta ni el Celta Fortuna están jugando ahora mismo.")
         return

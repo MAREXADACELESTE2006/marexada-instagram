@@ -81,7 +81,8 @@ def usar_tema(logo=None):
 
 # v52: un fondo distinto según el tipo de historia (la misma capa azul y el mismo pie, solo cambia la foto). Sin foto, se usa la grada de siempre.
 FONDO_POR_TIPO = {"convocatoria": "fondo_vestuario.jpg", "alineacion": "fondo_vestuario.jpg",
-                  "partemedico": "fondo_ciudad_deportiva.jpg", "clasificacion": "fondo_mural_balaidos.jpg"}
+                  "partemedico": "fondo_ciudad_deportiva.jpg", "clasificacion": "fondo_mural_balaidos.jpg",
+                  "gol": "fondo_gol.jpg"}          # v53: el gol dibuja su propio fondo (fondo_gol(), sin deformar la foto)
 _TIPO_FONDO = None
 
 
@@ -1179,4 +1180,131 @@ def previa(datos):
     return img
 
 
-RENDER = {"historia_portada": historia_portada, "pronostico": pronostico, "efemeride": efemeride, "cumpleanos": cumpleanos, "entradas": entradas, "partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}
+# ---------------------------------------------------------------- gol en directo (v53)
+def fondo_gol():
+    """Foto de la grada celebrando (assets/fondos/fondo_gol.jpg) SIN deformarla: una capa de fondo desenfocada y teñida de azul,
+    y encima la foto nítida arriba, que se funde con el azul hacia abajo."""
+    foto = Image.open(os.path.join(ASSETS, "fondos", "fondo_gol.jpg")).convert("RGB")
+
+    def cubrir(w, h, cx=0.46):
+        k = max(w / foto.width, h / foto.height)
+        im = foto.resize((math.ceil(foto.width * k), math.ceil(foto.height * k)), Image.LANCZOS)
+        x = int((im.width - w) * cx)
+        return im.crop((x, 0, x + w, h))
+
+    base = Image.blend(cubrir(W, H).filter(ImageFilter.GaussianBlur(9)), Image.new("RGB", (W, H), NAVY), 0.74)
+    alto = 1240
+    arriba = Image.blend(cubrir(W, alto), Image.new("RGB", (W, alto), NAVY), 0.34)
+    mascara = Image.new("L", (W, alto), 255)
+    md = ImageDraw.Draw(mascara)
+    for y in range(alto):
+        md.line([(0, y), (W, y)], fill=int(255 * min(1, max(0, 1 - (y - 640) / 560)) ** 1.2))
+    base.paste(arriba, (0, 0), mascara)
+    sombra = Image.new("L", (W, H), 0)                           # oscurece arriba (perfil de Instagram) y abajo (pie)
+    sd = ImageDraw.Draw(sombra)
+    for y in range(H):
+        sd.line([(0, y), (W, y)], fill=int(max(0, 1 - y / 360) * 110 + max(0, (y - 1380) / 540) * 130))
+    base.paste(Image.new("RGB", (W, H), (4, 12, 30)), (0, 0), sombra)
+    return base
+
+
+def _brillo(img, caja, color, alpha=210, desenfoque=24):
+    cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(cap).ellipse(caja, fill=color + (alpha,))
+    cap = cap.filter(ImageFilter.GaussianBlur(desenfoque))
+    img.paste(cap, (0, 0), cap)
+
+
+def gol(datos):
+    """«¡GOOOOOOL!» con quién marcó, el minuto y el marcador en ese momento. Solo para goles del Celta."""
+    img = fondo_gol(); d = ImageDraw.Draw(img)
+    y = SEGURA_SUP
+    logo = datos.get("logo")
+    if logo in LOGOS:
+        _logo_competicion(img, logo, W // 2, y, 112)
+        y += 112 + 24
+    # --- título
+    titulo = datos.get("titulo") or "¡GOOOOOOL!"
+    f = fit(d, titulo, 200, W - 130, 90)
+    bb = d.textbbox((0, 0), titulo, font=f, stroke_width=10)
+    cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))                  # resplandor azul detrás de las letras
+    ImageDraw.Draw(cap).text((W / 2 - d.textlength(titulo, font=f) / 2, y - bb[1]), titulo, font=f, fill=AZUL + (255,), stroke_width=22, stroke_fill=AZUL + (255,))
+    cap = cap.filter(ImageFilter.GaussianBlur(20))
+    img.paste(cap, (0, 0), cap)
+    d = ImageDraw.Draw(img)
+    _texto_borde(d, y - bb[1], titulo, f, WHITE, borde=(4, 14, 34), grosor=10)
+    y += bb[3] - bb[1] + 22
+    _texto_borde(d, y, _tag_v33(datos), font(36), AZUL, grosor=5)
+    yl = y + 66
+    _filete(d, yl)
+    # --- quién y cuándo
+    y = yl + 40
+    nom = (datos.get("goleador") or "").upper()
+    tam = 104
+    lineas = _nombre_lineas(d, nom, tam, W - 110)
+    if len(lineas) > 1:
+        tam = 92
+    for l in lineas:
+        fl = fit(d, l, tam, W - 90, 44)
+        bl = d.textbbox((0, 0), l, font=fl, stroke_width=7)
+        _texto_borde(d, y - bl[1], l, fl, WHITE, borde=(4, 14, 34), grosor=7)
+        y += int(tam * 1.06)
+    modo = {"penalti": "DE PENALTI", "propia": "EN PROPIA PUERTA"}.get((datos.get("modo") or "").lower())
+    if modo:
+        center(d, y + 2, modo, font(36), fill=AZUL)
+        y += 52
+    y += 22
+    mi = str(datos.get("minuto") or "").strip()
+    if mi:
+        fm = font(84)
+        wm = d.textlength(mi, font=fm)
+        ancho = wm + 62 + 56 + 50
+        x0 = W / 2 - ancho / 2
+        d.rounded_rectangle([x0, y, x0 + ancho, y + 112], 56, fill=AZUL)
+        _balon(d, int(x0 + 30 + 31), y + 56, 31)
+        bm = d.textbbox((0, 0), "8", font=fm)
+        d.text((x0 + 30 + 62 + 22, y + 56 - (bm[1] + bm[3]) / 2), mi, font=fm, fill=NAVY)
+        y += 112
+    # --- marcador con los dos escudos
+    r = 98
+    cy = y + 70 + r
+    local_marca = datos.get("lado") == "local"
+    for lado, x in (("local", 190), ("visitante", 890)):
+        if (lado == "local") == local_marca:
+            _brillo(img, (x - r - 38, cy - r - 38, x + r + 38, cy + r + 38), AZUL)
+        d = ImageDraw.Draw(img)
+        _escudo_redondo(img, x, cy, datos[lado], siglas(nombre(datos, lado)), r=r)
+        lins = _nombre_lineas(d, nombre(datos, lado), 34, 330)
+        for i, l in enumerate(lins):
+            _texto_borde(d, cy + r + 22 + i * 42, l, fit(d, l, 34, 330), WHITE, grosor=4, x=x)
+    a, b = str(datos["goles_local"]), str(datos["goles_visitante"])
+    tam, hueco, barra = 230, 30, 56
+    while tam > 90:
+        fs = font(tam)
+        total = d.textlength(a, font=fs) + d.textlength(b, font=fs) + 2 * hueco + barra
+        if total <= 440:
+            break
+        tam -= 6
+    fs = font(tam)
+    bn = d.textbbox((0, 0), "8", font=fs)
+    ty = cy - (bn[1] + bn[3]) / 2
+    x0 = W / 2 - total / 2
+    wa = d.textlength(a, font=fs)
+    _texto_borde(d, ty, a, fs, AZUL if local_marca else WHITE, grosor=8, x=x0 + wa / 2)
+    d.rounded_rectangle([x0 + wa + hueco, cy - 8, x0 + wa + hueco + barra, cy + 8], 8, fill=AZUL)
+    _texto_borde(d, ty, b, fs, WHITE if local_marca else AZUL, grosor=8, x=x0 + wa + 2 * hueco + barra + d.textlength(b, font=fs) / 2)
+    # --- «en directo»
+    yp = min(FIN_CONTENIDO - 76, cy + r + 22 + 2 * 42 + 40)
+    texto = "EN DIRECTO"
+    fd = font(36)
+    ancho = d.textlength(texto, font=fd) + 40 + 56
+    x0 = W / 2 - ancho / 2
+    _rgba(img, [x0, yp, x0 + ancho, yp + 76], 38, (4, 12, 30, 150), borde=(255, 255, 255, 90), grosor=2)
+    d = ImageDraw.Draw(img)
+    d.ellipse([x0 + 26, yp + 26, x0 + 50, yp + 50], fill=(238, 52, 52))
+    d.text((x0 + 70, yp + 38 - fd.size * 0.70), texto, font=fd, fill=WHITE)
+    _pie_v39(img, d)
+    return img
+
+
+RENDER = {"gol": gol, "historia_portada": historia_portada, "pronostico": pronostico, "efemeride": efemeride, "cumpleanos": cumpleanos, "entradas": entradas, "partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}

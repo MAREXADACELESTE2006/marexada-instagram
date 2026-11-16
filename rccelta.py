@@ -34,7 +34,7 @@ def norm(t):
     return re.sub(r"[^a-z0-9 ]+", " ", t)
 
 
-GENERICAS = {"ud", "cf", "fc", "cd", "rc", "rcd", "sd", "ad", "ce", "uds", "royale", "club", "de", "la", "el", "sk", "sc"}
+GENERICAS = {"c", "f", "ud", "cf", "fc", "cd", "rc", "rcd", "sd", "ad", "ce", "uds", "royale", "club", "de", "la", "el", "sk", "sc"}
 
 
 def slug_equipo(nombre):

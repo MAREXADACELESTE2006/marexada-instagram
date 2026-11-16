@@ -32,7 +32,7 @@ MADRID = ZoneInfo("Europe/Madrid")
 ESTADO = os.path.join(BASE, "estado", "publicado.json")
 AGENDA = os.path.join(BASE, "estado", "agenda.json")           # fechas de los partidos cercanos (la usa el modo rápido para saber si hay algo que vigilar)
 RAPIDAS = {"calendario.py", "noticias.py", "resultados.py", "futbolme.py", "besoccer.py", "directo.py"}     # fuentes del modo rápido: convocatorias y resultados
-CLAVES_RAPIDAS = ("convocatoria-", "cronica-", "resultado-", "inicio-", "descanso-")
+CLAVES_RAPIDAS = ("convocatoria-", "cronica-", "resultado-", "inicio-", "descanso-", "gol-")
 HASHTAGS = "#RCCelta #Celta #MarexadaCeleste"
 
 RECORDATORIOS = {
@@ -234,7 +234,15 @@ def plan(hoy, datos, avisos):
         if nombre == "celta" and previa and f == hoy:
             continue                                   # el día del partido en casa ya sale la previa
         cuando = "Hoxe" if f == hoy else "Mañá"
-        add(f"proximo-{nombre}-{d['fecha_hora']}", fichero, "mañana", "10:00",
+        clave_prox = f"proximo-{nombre}-{d['fecha_hora']}"
+        if f == hoy:
+            # v55: el aviso del día del partido es una publicación propia (antes compartía clave con el de «Mañá» y, si ya había salido el día anterior, hoy no salía nada)
+            clave_prox = f"proximo-{nombre}-hoxe-{d['fecha_hora']}"
+            hh = re.search(r"(\d{1,2}):(\d{2})", d["fecha_hora"] or "")
+            ahora_m = datetime.datetime.now(MADRID)
+            if hh and ahora_m.date() == hoy and ahora_m >= ahora_m.replace(hour=int(hh.group(1)), minute=int(hh.group(2)), second=0, microsecond=0):
+                continue                               # el partido ya ha empezado: ya no tiene sentido «Hoxe xogamos»
+        add(clave_prox, fichero, "mañana", "10:00",
             f"{cuando} xogamos! {nombre_lado(d, 'local')} - {nombre_lado(d, 'visitante')}, {d['fecha_hora']}. Forza! 💙 {etiquetas(nombre)}")
 
     pr = datos.get("pronostico_celta.json")                       # viernes: pronóstico da peña (el resultado lo pone la gente con la enquisa)
@@ -282,14 +290,23 @@ def plan(hoy, datos, avisos):
         add(f"resultado-{nombre}-{r['fecha_hora']}-{r['goles_local']}-{r['goles_visitante']}" + ("-g" if con_gol else ""), fichero, "resultado", "xusto ao rematar o partido",
             f"Final: {nombre_lado(r, 'local')} {r['goles_local']} - {r['goles_visitante']} {nombre_lado(r, 'visitante')}. {cierre} 💙 {etiquetas(nombre)}{aviso_gol}")
 
-    dv = datos.get("directo_celta_inicio.json")                   # v50: Celta en directo (solo el primer equipo): inicio y descanso
-    if dv:
-        add(f"inicio-celta-{dv['_fecha']}-{dv['_id']}", "directo_celta_inicio.json", "resultado", "xusto ao comezar o partido",
-            f"Comeza o partido! {nombre_lado(dv, 'local')} - {nombre_lado(dv, 'visitante')}. Forza Celta! 💙 {HASHTAGS}")
-    dd = datos.get("directo_celta_descanso.json")
-    if dd:
-        add(f"descanso-celta-{dd['_fecha']}-{dd['_id']}", "directo_celta_descanso.json", "resultado", "no descanso",
-            f"Descanso! {nombre_lado(dd, 'local')} {dd['goles_local']} - {dd['goles_visitante']} {nombre_lado(dd, 'visitante')}. Forza Celta! 💙 {HASHTAGS}")
+    for nombre, quien in (("celta", "Celta"), ("fortuna", "Celta Fortuna")):          # v53: directo del Celta y del Celta Fortuna: inicio y descanso
+        dv = datos.get(f"directo_{nombre}_inicio.json")
+        if dv:
+            add(f"inicio-{nombre}-{dv['_fecha']}-{dv['_id']}", f"directo_{nombre}_inicio.json", "resultado", "xusto ao comezar o partido",
+                f"Comeza o partido! {nombre_lado(dv, 'local')} - {nombre_lado(dv, 'visitante')}. Forza {quien}! 💙 {HASHTAGS}")
+        dd = datos.get(f"directo_{nombre}_descanso.json")
+        if dd:
+            add(f"descanso-{nombre}-{dd['_fecha']}-{dd['_id']}", f"directo_{nombre}_descanso.json", "resultado", "no descanso",
+                f"Descanso! {nombre_lado(dd, 'local')} {dd['goles_local']} - {dd['goles_visitante']} {nombre_lado(dd, 'visitante')}. Forza {quien}! 💙 {HASHTAGS}")
+    for fichero in sorted(f for f in datos if re.fullmatch(r"directo_celta_gol_\d+\.json", f)):         # v53: un «¡GOOOOOOL!» por cada gol del Celta (los del rival no se publican)
+        g = datos[fichero]
+        if not g or not g.get("goleador"):
+            continue
+        quien = re.sub(r"[^a-z0-9]+", "-", unicodedata.normalize("NFKD", g["goleador"]).encode("ascii", "ignore").decode().lower()).strip("-")
+        extra = {"penalti": " (de penalti)", "propia": " (en propia porta)"}.get(g.get("modo"), "")
+        add(f"gol-celta-{g['_fecha']}-{g['_id']}-{g['_n']}-{g['goles_local']}-{g['goles_visitante']}-{quien}", fichero, "resultado", "xusto agora (en directo)",
+            f"GOOOOOOL! ⚽ {g['goleador']}{extra} ({g['minuto']}). {nombre_lado(g, 'local')} {g['goles_local']} - {g['goles_visitante']} {nombre_lado(g, 'visitante')}. Forza Celta! 💙 {HASHTAGS}")
 
     tabla = {0: ("clasificacion_celta_laliga.json", "laliga", "LaLiga"), 1: ("clasificacion_celta_fortuna.json", "fortuna", "LaLiga Hypermotion (Celta Fortuna)"),
              3: ("clasificacion_as_celtas_fem.json", "as-celtas-fem", "Segunda Federación Femenina (AS Celtas)")}.get(wd)
@@ -409,7 +426,7 @@ def main():
             ("clasificaciones.py", ["--salida", d_datos], "Clasificaciones"),
             ("noticias.py", ["--salida", d_datos], "Noticias rccelta.es"),
             ("resultados.py", ["--ahora", ahora, "--salida", d_datos], "Resultados Celta/Fortuna"),
-            ("directo.py", ["--salida", d_datos], "Celta en directo"),
+            ("directo.py", ["--salida", d_datos], "Celta y Celta Fortuna en directo"),
             ("futbolme.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "AS Celtas Fem (futbolme)"),
             ("partemedico.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Parte médico (rccelta.es)"),
             ("entradas.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Entradas (rccelta.es)"),

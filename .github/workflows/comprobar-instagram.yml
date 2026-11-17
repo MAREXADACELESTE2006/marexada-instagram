@@ -1,0 +1,20 @@
+name: Comprobar conexión con Instagram
+
+on:
+  workflow_dispatch:               # botón "Run workflow": solo comprueba el token y el ID, no publica nada
+
+jobs:
+  comprobar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Comprobar el token de Instagram
+        env:
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          IG_GRAPH_URL: ${{ vars.IG_GRAPH_URL }}
+        run: python instagram.py --comprobar

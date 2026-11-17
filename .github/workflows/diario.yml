@@ -8,7 +8,7 @@ on:
     - cron: "30 22 * * *"          # 23:30 / 00:30
     # --- Ejecuciones RÁPIDAS (solo convocatorias y resultados) ---
     - cron: "12,42 9-13 * * *"     # cada 30 min de 10:05 a 14:35 (invierno): para pillar la convocatoria cuando la publica el club
-    - cron: "*/15 14-23 * * *"         # cada 15 min de 15:00 a 00:45 (invierno), TODOS los días (también martes y miércoles, Copa): resultados al acabar y, para el Celta, inicio y descanso en directo (v51)
+    - cron: "*/15 14-23 * * *"         # cada 15 min de 15:00 a 00:45 (invierno), TODOS los días (también martes y miércoles, Copa): resultados al acabar y, en directo, goles del Celta e inicio y descanso del Celta y del Celta Fortuna
   workflow_dispatch:               # botón "Run workflow" (a mano o desde un servicio externo): por defecto hace una ejecución completa
     inputs:
       modo:
@@ -16,7 +16,7 @@ on:
         default: "completo"
 
 permissions:
-  contents: write                  # para guardar estado/publicado.json y estado/agenda.json en el repositorio
+  contents: write                  # para guardar estado/publicado.json y estado/agenda.json en el repositorio, y las imágenes en la rama «imagenes»
 
 concurrency:
   group: historias                 # una ejecución cada vez: así no se repiten historias ni se pisa el estado
@@ -25,7 +25,7 @@ concurrency:
 jobs:
   historias:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     env:
       MODO: ${{ github.event_name == 'workflow_dispatch' && (inputs.modo || 'completo') || (contains(fromJSON('["0 6 * * *","30 16 * * *","30 22 * * *"]'), github.event.schedule) && 'completo' || 'rapido') }}
     steps:
@@ -39,8 +39,25 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          IG_SIMULACRO: ${{ vars.IG_SIMULACRO }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python diario.py --modo "$MODO"
+      - name: Publicar en Instagram
+        if: always()                   # también si diario.py avisa de un error: lo que ya estaba en cola sigue saliendo
+        continue-on-error: true
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          IG_SIMULACRO: ${{ vars.IG_SIMULACRO }}
+          IG_PAUSA: ${{ vars.IG_PAUSA }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python instagram.py
       - name: Guardar las historias para descargarlas
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: historias
@@ -48,6 +65,7 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
       - name: Recordar lo ya generado
+        if: always()
         run: |
           git config user.name "marexada-bot"
           git config user.email "marexada-bot@users.noreply.github.com"

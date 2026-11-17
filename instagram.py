@@ -1,4 +1,4 @@
-"""Marexada Celeste · publicación AUTOMÁTICA de historias en Instagram (v58).
+"""Marexada Celeste · publicación AUTOMÁTICA de historias en Instagram (v59).
 
 Cómo funciona:
   1. diario.py genera las imágenes y llama a encolar(): la imagen se sube a la rama «imagenes» de este mismo repositorio (público) para que
@@ -12,7 +12,7 @@ Opcionales:  IG_SIMULACRO=1 (sube la imagen y dice qué publicaría, pero NO pub
 Uso:
     python instagram.py                 (publica lo pendiente que ya toque)
     python instagram.py --comprobar     (comprueba el token y dice con qué cuenta de Instagram está conectado)
-    python instagram.py --prueba        (v58: publica DE VERDAD una historia de prueba, aunque IG_SIMULACRO=1; solo si PRUEBA_CONFIRMADA=SI)
+    python instagram.py --prueba        (v58/v59: publica DE VERDAD una historia de prueba, aunque IG_SIMULACRO=1; solo si PRUEBA_CONFIRMADA=SI)
 """
 import argparse
 import base64
@@ -85,16 +85,23 @@ def _gh(metodo, ruta, cuerpo=None):
     token, repo = os.environ["GITHUB_TOKEN"], os.environ["GITHUB_REPOSITORY"]
     cab = {"authorization": f"Bearer {token}", "accept": "application/vnd.github+json", "user-agent": "marexada-bot", "x-github-api-version": "2022-11-28"}
     datos = json.dumps(cuerpo).encode() if cuerpo is not None else None
-    return _peticion(f"https://api.github.com/repos/{repo}/{ruta}", datos=datos, cabeceras=cab, metodo=metodo)
+    url = f"https://api.github.com/repos/{repo}" + (f"/{ruta}" if ruta else "")
+    return _peticion(url, datos=datos, cabeceras=cab, metodo=metodo)
 
 
 def asegurar_rama():
+    """Crea la rama «imagenes» (a partir de la versión que se está ejecutando) si todavía no existe."""
     codigo, _ = _gh("GET", f"git/ref/heads/{RAMA}")
     if codigo == 200:
         return
-    _, repo = _gh("GET", "")
-    _, ref = _gh("GET", f"git/ref/heads/{repo['default_branch']}")
-    codigo, j = _gh("POST", "git/refs", {"ref": f"refs/heads/{RAMA}", "sha": ref["object"]["sha"]})
+    sha = os.environ.get("GITHUB_SHA")                               # el commit que ejecuta el workflow: no hace falta preguntar por la rama principal
+    if not sha:
+        c, repo = _gh("GET", "")
+        c2, ref = _gh("GET", f"git/ref/heads/{repo.get('default_branch', 'main')}")
+        if c >= 300 or c2 >= 300 or "object" not in ref:
+            raise RuntimeError(f"no se pudo leer la rama principal del repositorio ({c}/{c2})")
+        sha = ref["object"]["sha"]
+    codigo, j = _gh("POST", "git/refs", {"ref": f"refs/heads/{RAMA}", "sha": sha})
     if codigo >= 300 and codigo != 422:                              # 422 = ya existe (otra ejecución la acaba de crear)
         raise RuntimeError(f"no se pudo crear la rama «{RAMA}» ({codigo}: {j.get('message', '')})")
 

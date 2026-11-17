@@ -40,8 +40,30 @@ def fit(d, text, size, maxw, minsize=18):
     return f
 
 
+def _sombra_texto(d, x, y, text, f, alpha=135, desenfoque=6, dy=4):
+    """v60: sombra suave bajo un texto claro (se lee mejor sobre la foto). Si no se puede, no hace nada."""
+    im = getattr(d, "_image", None)
+    if im is None or im.mode != "RGB" or not text.strip():
+        return
+    m = desenfoque * 3 + 4
+    bb = d.textbbox((x, y), text, font=f)
+    x0, y0, x1, y1 = int(bb[0] - m), int(bb[1] - m + dy), int(bb[2] + m), int(bb[3] + m + dy)
+    capa = Image.new("L", (x1 - x0, y1 - y0), 0)
+    ImageDraw.Draw(capa).text((x - x0, y - y0 + dy), text, font=f, fill=alpha)
+    capa = capa.filter(ImageFilter.GaussianBlur(desenfoque))
+    cx0, cy0 = max(0, x0), max(0, y0)
+    cx1, cy1 = min(im.width, x1), min(im.height, y1)
+    if cx1 <= cx0 or cy1 <= cy0:
+        return
+    capa = capa.crop((cx0 - x0, cy0 - y0, cx1 - x0, cy1 - y0))
+    im.paste((2, 8, 20), (cx0, cy0, cx1, cy1), capa)
+
+
 def center(d, y, text, f, fill=WHITE, x=W // 2):
-    d.text((x - d.textlength(text, font=f) / 2, y), text, font=f, fill=fill)
+    px = x - d.textlength(text, font=f) / 2
+    if isinstance(fill, tuple) and sum(fill[:3]) > 450:                  # solo los textos claros llevan sombra
+        _sombra_texto(d, px, y, text, f)
+    d.text((px, y), text, font=f, fill=fill)
 
 
 # ---------------------------------------------------------------- datos -> textos
@@ -69,13 +91,16 @@ def etiqueta_equipo(datos):
 # ---------------------------------------------------------------- piezas
 _TEMA_BASE = {"navy": NAVY, "acento": AZUL}
 _TEMAS = {"copa": {"navy": (86, 8, 28), "acento": (255, 178, 178)},            # Copa del Rey: fondo teñido de rojo
-          "europa": {"navy": (34, 16, 6), "acento": (255, 150, 48)}}          # Europa League: fondo oscuro cálido y acento naranja
+          "europa": {"navy": (34, 16, 6), "acento": (255, 150, 48)},          # Europa League: fondo oscuro cálido y acento naranja
+          "hypermotion": {"navy": (3, 38, 42), "acento": (72, 226, 214)}}     # v60: LaLiga Hypermotion (Celta Fortuna): fondo verde petróleo y acento turquesa
+_TEMAS_TAG = {"AS CELTAS FEM": {"navy": (32, 14, 58), "acento": (206, 172, 255)},      # v60: AS Celtas (femenino): fondo violeta oscuro y acento lila
+              "CELTA FORTUNA": {"navy": (3, 38, 42), "acento": (72, 226, 214)}}         # v61: el Celta Fortuna siempre en turquesa (parte médico, etc.), aunque no lleve logo de competición   # v60: AS Celtas (femenino): fondo violeta oscuro y acento lila
 
 
-def usar_tema(logo=None):
-    """Cambia los colores de las historias según la competición (Copa del Rey = rojo). Llamar antes de dibujar."""
+def usar_tema(logo=None, tag=None):
+    """Cambia los colores de las historias según la competición (Copa = rojo, Europa = naranja, Hypermotion = turquesa, femenino = lila, LaLiga = celeste)."""
     global NAVY, AZUL
-    t = _TEMAS.get(logo, _TEMA_BASE)
+    t = _TEMAS.get(logo) or _TEMAS_TAG.get(tag) or _TEMA_BASE
     NAVY, AZUL = t["navy"], t["acento"]
 
 
@@ -93,6 +118,9 @@ def fondo():
     if not os.path.exists(ruta):
         ruta = os.path.join(ASSETS, "fondos", "historia_provisional.jpg")
     img = Image.open(ruta).convert("RGB").resize((W, H), Image.LANCZOS)
+    if NAVY != _TEMA_BASE["navy"]:                      # v61: en los equipos/competiciones con otro color la foto se desatura para que el tinte se note de verdad
+        from PIL import ImageOps
+        img = Image.blend(img, ImageOps.grayscale(img).convert("RGB"), 0.7)
     img = Image.blend(img, Image.new("RGB", (W, H), NAVY), 0.66)
     # oscurece arriba y abajo para que se lea el texto
     sombra = Image.new("L", (W, H), 0)
@@ -269,17 +297,21 @@ def _nombre_lineas(d, n, tam, maxw):
     return [n]
 
 
-def _bloque_partido(img, d, datos, cy, r=98, centro="VS", cx=(270, 810), tam=36):
-    """Los dos escudos con su nombre debajo y el centro (VS o marcador). Devuelve la y donde acaban los nombres."""
+def _bloque_partido(img, d, datos, cy, r=98, centro="VS", cx=(270, 810), tam=36, brillo=()):
+    """Los dos escudos con su nombre debajo y el centro (VS o marcador). Devuelve la y donde acaban los nombres.
+    brillo: lados que llevan un resplandor del color de la competición detrás del escudo (v60)."""
     fin = cy
     for lado, x in (("local", cx[0]), ("visitante", cx[1])):
+        if lado in brillo:
+            _brillo(img, (x - r - 30, cy - r - 30, x + r + 30, cy + r + 30), AZUL, alpha=48, desenfoque=20)
+            d = ImageDraw.Draw(img)
         _escudo_redondo(img, x, cy, datos[lado], siglas(nombre(datos, lado)), r=r)
         lineas = _nombre_lineas(d, nombre(datos, lado), tam, 420)
         for i, l in enumerate(lineas):
             center(d, cy + r + 20 + i * (tam + 8), l, fit(d, l, tam, 420), x=x)
         fin = max(fin, cy + r + 20 + len(lineas) * (tam + 8))
     if centro:
-        center(d, cy - 38, centro, font(64), fill=AZUL)
+        center(d, cy - 52, centro, font(92), fill=AZUL)
     return fin
 
 
@@ -565,21 +597,60 @@ def alineacion(datos):
     return _ajustar(_alineacion, datos)
 
 
+def _hoy():
+    v = os.environ.get("MAREXADA_HOY")                      # solo para pruebas: MAREXADA_HOY=2026-11-06
+    if v:
+        return datetime.date.fromisoformat(v)
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.datetime.now(ZoneInfo("Europe/Madrid")).date()
+    except Exception:
+        return datetime.date.today()
+
+
+def cuenta_atras(datos):
+    """'HOXE', 'MAÑÁ' o 'FALTAN 3 DÍAS' (hasta 14 días); None si no hay fecha o el partido ya pasó."""
+    m = re.search(r"(\d{1,2})/(\d{1,2})", datos.get("fecha_hora") or "")
+    if not m:
+        return None
+    hoy = _hoy()
+    try:
+        f = datetime.date(hoy.year, int(m.group(2)), int(m.group(1)))
+    except ValueError:
+        return None
+    if (f - hoy).days < -200:                                # partido ya del año que viene
+        f = f.replace(year=hoy.year + 1)
+    n = (f - hoy).days
+    if n < 0 or n > 14:
+        return None
+    return "HOXE" if n == 0 else "MAÑÁ" if n == 1 else f"FALTAN {n} DÍAS"
+
+
 def _proximo(datos, s, hg=0):
     img = fondo(); d = ImageDraw.Draw(img)
     yl = _cab_logo(img, d, "PRÓXIMO PARTIDO", _tag_v33(datos), datos.get("logo"), s)
     r = int(112 * s)
     cy = yl + r + 30
-    fin = _bloque_partido(img, d, datos, cy, r=r, tam=int(38 * s))
+    fin = _bloque_partido(img, d, datos, cy, r=r, tam=int(38 * s), brillo=("local", "visitante"))
+    d = ImageDraw.Draw(img)
     dia, hora = fecha_larga(datos.get("fecha_hora"))
     j = (datos.get("jornada") or "").strip()
     j = "" if re.search(r"\bX$", j) else j
     lugar = datos.get("lugar")
+    cd = cuenta_atras(datos)
     ta, th = int(58 * s), int(190 * s)
-    alto = 30 + (ta + 26 if dia else 0) + (th + 22 if hora else 0) + (58 if lugar else 0) + (66 if j else 0) + 24
+    alto = 30 + (int(64 * s) + 22 if cd else 0) + (ta + 26 if dia else 0) + (th + 22 if hora else 0) + (58 if lugar else 0) + (66 if j else 0) + 24
     y0 = fin + 44 + hg
-    _rgba(img, [60, y0, W - 60, y0 + alto], 36, (4, 12, 30, 105), borde=(255, 255, 255, 40), grosor=2)
+    _rgba(img, [60, y0, W - 60, y0 + alto], 36, (4, 12, 30, 105), borde=AZUL + (95,), grosor=3)
     y = y0 + 30
+    if cd:                                                    # v60: cuenta atrás en píldora del color de la competición
+        fc = font(int(38 * s))
+        wc = d.textlength(cd, font=fc)
+        hc = int(64 * s)
+        d.rounded_rectangle([W / 2 - wc / 2 - 36, y, W / 2 + wc / 2 + 36, y + hc], hc // 2, fill=AZUL)
+        bc = d.textbbox((0, 0), "A", font=fc)
+        d.text((W / 2 - wc / 2, y + hc / 2 - (bc[1] + bc[3]) / 2), cd, font=fc, fill=NAVY)
+        y += hc + 22
     if dia:
         center(d, y, dia, fit(d, dia, ta, W - 160))
         y += ta + 26
@@ -615,9 +686,15 @@ def _resultado(datos, s, hg=0):
     hay = bool(gl or gv)
     r = int((96 if hay else 118) * s)
     cy = yl + r + 28
-    fin = _bloque_partido(img, d, datos, cy, r=r, centro=None, cx=(270, 810), tam=int(36 * s))
+    try:
+        ga, gb = int(datos["goles_local"]), int(datos["goles_visitante"])
+    except (TypeError, ValueError):
+        ga = gb = 0
+    ganador = ("local",) if ga > gb else ("visitante",) if gb > ga else ()      # v60: el escudo del que gana lleva resplandor
+    fin = _bloque_partido(img, d, datos, cy, r=r, centro=None, cx=(270, 810), tam=int(36 * s), brillo=ganador)
+    d = ImageDraw.Draw(img)
     a, b = str(datos["goles_local"]), str(datos["goles_visitante"])
-    tam = int((290 if hay else 380) * s)
+    tam = int((320 if hay else 430) * s)
     hueco = 52
     while tam > 100:
         f = font(tam)
@@ -632,9 +709,12 @@ def _resultado(datos, s, hg=0):
     ytxt = cs - (bb[1] + alto_num / 2)
     wa = d.textlength(a, font=f)
     x0 = W / 2 - total / 2
-    d.text((x0, ytxt), a, font=f, fill=WHITE)
+    _brillo(img, (x0 - 70, cs - alto_num * 0.62, x0 + total + 70, cs + alto_num * 0.62), AZUL, alpha=70, desenfoque=40)
+    d = ImageDraw.Draw(img)
+    borde = (4, 14, 34)
+    d.text((x0, ytxt), a, font=f, fill=AZUL if ga > gb else WHITE, stroke_width=7, stroke_fill=borde)
     d.rounded_rectangle([x0 + wa + hueco, cs - 9, x0 + wa + hueco + 70, cs + 9], 9, fill=AZUL)
-    d.text((x0 + wa + 2 * hueco + 70, ytxt), b, font=f, fill=WHITE)
+    d.text((x0 + wa + 2 * hueco + 70, ytxt), b, font=f, fill=AZUL if gb > ga else WHITE, stroke_width=7, stroke_fill=borde)
     yp = cs + alto_num / 2 + 6 + 40 + hg
     dia, _ = fecha_larga(datos.get("fecha_hora"))
     j = (datos.get("jornada") or "").strip()
@@ -647,7 +727,7 @@ def _resultado(datos, s, hg=0):
         y0 = yp + 30 + hg
         rh = max(40, min(66, (FIN_CONTENIDO - y0 - 100) // max(filas, 1)))
         alto = 78 + filas * rh + 16
-        _rgba(img, [40, y0, W - 40, y0 + alto], 30, (4, 12, 30, 115))
+        _rgba(img, [40, y0, W - 40, y0 + alto], 30, (4, 12, 30, 115), borde=AZUL + (75,), grosor=3)
         center(d, y0 + 16, "GOLEADORES", font(28), fill=AZUL)
         d.line([(W // 2, y0 + 70), (W // 2, y0 + alto - 20)], fill=(255, 255, 255, 60), width=2)
         for lista, x in ((gl, 70), (gv, 570)):   # columnas de 440 px
@@ -719,7 +799,7 @@ def clasificacion(datos):
         y = y0 + i * ph
         destacado = f["nombre"] == datos.get("destacado")
         cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        ImageDraw.Draw(cap).rounded_rectangle([40, y, W - 40, y + ph - 6], 12, fill=(146, 202, 246, 110) if destacado else (255, 255, 255, 30))
+        ImageDraw.Draw(cap).rounded_rectangle([40, y, W - 40, y + ph - 6], 12, fill=AZUL + (105,) if destacado else (255, 255, 255, 30))
         img.paste(cap, (0, 0), cap)
         d = ImageDraw.Draw(img)
         cy = y + (ph - 6) // 2
@@ -1271,7 +1351,7 @@ def gol(datos):
     local_marca = datos.get("lado") == "local"
     for lado, x in (("local", 190), ("visitante", 890)):
         if (lado == "local") == local_marca:
-            _brillo(img, (x - r - 38, cy - r - 38, x + r + 38, cy + r + 38), AZUL)
+            _brillo(img, (x - r - 30, cy - r - 30, x + r + 30, cy + r + 30), AZUL, alpha=105, desenfoque=22)
         d = ImageDraw.Draw(img)
         _escudo_redondo(img, x, cy, datos[lado], siglas(nombre(datos, lado)), r=r)
         lins = _nombre_lineas(d, nombre(datos, lado), 34, 330)
@@ -1305,6 +1385,21 @@ def gol(datos):
     d.text((x0 + 70, yp + 38 - fd.size * 0.70), texto, font=fd, fill=WHITE)
     _pie_v39(img, d)
     return img
+
+
+def acabado(img):
+    """v60: toque final de todas las historias: halo del color de la competición arriba, viñeteado en los bordes y un grano muy fino."""
+    from PIL import ImageChops
+    img = img.convert("RGB")
+    halo = Image.new("L", img.size, 0)
+    hd = ImageDraw.Draw(halo)
+    for y in range(430):
+        hd.line([(0, y), (img.width, y)], fill=int(72 * (1 - y / 430) ** 1.7))
+    img.paste(Image.new("RGB", img.size, AZUL), (0, 0), halo)
+    grad = Image.radial_gradient("L").point(lambda v: int(max(0, v - 120) * 0.42)).resize(img.size, Image.BICUBIC)
+    img.paste(Image.new("RGB", img.size, (2, 8, 20)), (0, 0), grad)
+    ruido = Image.effect_noise(img.size, 26).convert("RGB")
+    return Image.blend(img, ImageChops.overlay(img, ruido), 0.16)
 
 
 RENDER = {"gol": gol, "historia_portada": historia_portada, "pronostico": pronostico, "efemeride": efemeride, "cumpleanos": cumpleanos, "entradas": entradas, "partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}

@@ -384,6 +384,27 @@ def telegram(historias, resumen, avisos, rapido=False):
 
 
 # ---------------------------------------------------------------- principal
+def ventana_instagram(h, t=None):
+    """(desde, hasta) para publicar la historia en Instagram: la hora sugerida si es una hora concreta (10:00, 19:00...), si no, ya;
+    y hasta cuándo sigue valiendo (en directo, poco; resultados y convocatorias, unas horas; el resto, hasta final del día)."""
+    t = t or datetime.datetime.now(MADRID)
+    desde = t
+    m = re.fullmatch(r"(\d{1,2}):(\d{2})", h.get("hora") or "")
+    if m:
+        previsto = t.replace(hour=int(m.group(1)), minute=int(m.group(2)), second=0, microsecond=0)
+        desde = max(t, previsto)
+    c = h["clave"]
+    if c.startswith(("gol-", "inicio-", "descanso-")):
+        hasta = desde + datetime.timedelta(minutes=45)
+    elif c.startswith(("resultado-", "cronica-")):
+        hasta = desde + datetime.timedelta(hours=8)
+    elif c.startswith("convocatoria-"):
+        hasta = desde + datetime.timedelta(hours=10)
+    else:
+        hasta = t.replace(hour=23, minute=59, second=0, microsecond=0)
+    return desde, max(hasta, desde + datetime.timedelta(minutes=30))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--hoy", default=None, help="AAAA-MM-DD (por defecto, hoy en Madrid)")
@@ -391,6 +412,7 @@ def main():
     ap.add_argument("--forzar", action="store_true")
     ap.add_argument("--sin-estado", action="store_true")
     ap.add_argument("--sin-telegram", action="store_true")
+    ap.add_argument("--sin-instagram", action="store_true", help="no sube las imágenes ni las apunta para publicar en Instagram")
     ap.add_argument("--salida", default=os.path.join(BASE, "salida"))
     ap.add_argument("--modo", choices=("completo", "rapido"), default="completo",
                     help="rapido: solo convocatorias y resultados (se ejecuta cada 15-20 minutos; si no hay partido cerca, termina enseguida)")
@@ -472,6 +494,14 @@ def main():
             avisos.append(f"No se pudo generar {h['clave']}: {e}")
             h["imagen"] = None
     historias = [h for h in historias if h["imagen"]]
+    if not a.offline and not a.sin_instagram:                          # v57: las historias nuevas se suben y se apuntan para publicarlas en Instagram (lo hace instagram.py)
+        import instagram
+        if instagram.activo():
+            for h in historias:
+                try:
+                    instagram.encolar(h["clave"], h["imagen"], h["texto"], *ventana_instagram(h))
+                except Exception as e:
+                    avisos.append(f"Instagram (preparar {h['clave']}): {e}")
 
     dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
     L = [f"# Historias de {dias[hoy.weekday()]} {hoy.strftime('%d/%m/%Y')}", ""]

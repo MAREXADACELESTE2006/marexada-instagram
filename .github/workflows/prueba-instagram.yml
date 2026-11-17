@@ -1,0 +1,33 @@
+name: Prueba de Instagram (publica UNA historia de verdad)
+
+on:
+  workflow_dispatch:               # botón "Run workflow": publica una historia de prueba fija en la cuenta; no toca el diario ni la cola
+    inputs:
+      confirmar:
+        description: "Escribe SI para publicar de verdad una historia de prueba (si no, no se publica nada)"
+        default: "NO"
+
+permissions:
+  contents: write                  # para alojar la imagen un momento en la rama «imagenes»
+
+jobs:
+  prueba:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Publicar la historia de prueba
+        env:
+          PRUEBA_CONFIRMADA: ${{ inputs.confirmar }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          IG_GRAPH_URL: ${{ vars.IG_GRAPH_URL }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python instagram.py --prueba

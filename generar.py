@@ -274,12 +274,37 @@ def resultado(datos):
 RENDER = {"convocatoria": convocatoria, "alineacion": alineacion, "resultado": resultado}
 
 
+def foto_especial(datos):
+    """v64: fotos propias para tres casos (el resto de historias no cambia):
+    · partido de Europa League (previa, próximo partido, convocatoria, alineación, inicio, descanso y resultado) -> fondo_europa.jpg
+    · inicio de partido del Celta (primer equipo)                                                          -> fondo_inicio.jpg
+    · resultado con victoria del Celta (primer equipo)                                                     -> fondo_victoria.jpg"""
+    tipo, titulo = datos.get("tipo"), (datos.get("titulo") or "").upper()
+    if tipo not in ("previa", "proximo", "convocatoria", "alineacion", "resultado"):
+        return None
+    if datos.get("logo") == "europa" or datos.get("competicion") == "europa":
+        return "fondo_europa.jpg"
+    if "celta-vigo" not in (datos.get("local"), datos.get("visitante")) or datos.get("tag") == "CELTA FORTUNA":
+        return None
+    if tipo == "resultado" and titulo.startswith("COMIENZA"):
+        return "fondo_inicio.jpg"
+    if tipo == "resultado" and "DESCANSO" not in titulo:
+        try:
+            gc, gr = (datos["goles_local"], datos["goles_visitante"]) if datos["local"] == "celta-vigo" else (datos["goles_visitante"], datos["goles_local"])
+            if int(gc) > int(gr):
+                return "fondo_victoria.jpg"
+        except (KeyError, TypeError, ValueError):
+            pass
+    return None
+
+
 def generar(ruta_json, salida=None):
     global T
     datos = json.load(open(ruta_json, encoding="utf-8"))
     T = THEMES[datos.get("competicion", "liga")]
     HISTORIA.usar_tema(datos.get("logo"), datos.get("tag"))
     HISTORIA._TIPO_FONDO = datos.get("tipo")
+    HISTORIA._FOTO_ESPECIAL = foto_especial(datos)
     if datos["tipo"] in HISTORIA.RENDER:
         img = HISTORIA.RENDER[datos["tipo"]](datos)  # TODO sale como historia 1080x1920 (también Europa League)
         img = HISTORIA.acabado(img)                  # v60: halo de color, viñeteado y grano

@@ -109,9 +109,12 @@ FONDO_POR_TIPO = {"convocatoria": "fondo_vestuario.jpg", "alineacion": "fondo_ve
                   "partemedico": "fondo_ciudad_deportiva.jpg", "clasificacion": "fondo_mural_balaidos.jpg",
                   "gol": "fondo_gol.jpg"}          # v53: el gol dibuja su propio fondo (fondo_gol(), sin deformar la foto)
 _TIPO_FONDO = None
+_FOTO_ESPECIAL = None        # v64: foto concreta para esta historia (victoria del Celta, inicio de partido, partidos de Europa League); la pone generar.py
 
 
 def fondo():
+    if _FOTO_ESPECIAL and os.path.isfile(os.path.join(ASSETS, "fondos", _FOTO_ESPECIAL)):
+        return fondo_foto(_FOTO_ESPECIAL)
     ruta = os.path.join(ASSETS, "fondos", FONDO_POR_TIPO.get(_TIPO_FONDO, ""))
     if not os.path.isfile(ruta):
         ruta = os.path.join(ASSETS, "fondos", "historia.jpg")
@@ -1284,6 +1287,33 @@ def fondo_gol():
     sd = ImageDraw.Draw(sombra)
     for y in range(H):
         sd.line([(0, y), (W, y)], fill=int(max(0, 1 - y / 360) * 110 + max(0, (y - 1380) / 540) * 130))
+    base.paste(Image.new("RGB", (W, H), (4, 12, 30)), (0, 0), sombra)
+    return base
+
+
+def fondo_foto(nombre, tinte=0.5, cx=0.5):
+    """v64: igual que fondo_gol() pero con cualquier foto de assets/fondos, SIN deformarla (la foto nítida arriba, que se funde con el color de la
+    competición hacia abajo, y una capa desenfocada detrás). El tinte oscurece algo más la foto para que el texto se lea bien."""
+    foto = Image.open(os.path.join(ASSETS, "fondos", nombre)).convert("RGB")
+
+    def cubrir(w, h):
+        k = max(w / foto.width, h / foto.height)
+        im = foto.resize((math.ceil(foto.width * k), math.ceil(foto.height * k)), Image.LANCZOS)
+        x = int((im.width - w) * cx)
+        return im.crop((x, 0, x + w, h))
+
+    base = Image.blend(cubrir(W, H).filter(ImageFilter.GaussianBlur(9)), Image.new("RGB", (W, H), NAVY), 0.78)
+    alto = 1240
+    arriba = Image.blend(cubrir(W, alto), Image.new("RGB", (W, alto), NAVY), tinte)
+    mascara = Image.new("L", (W, alto), 255)
+    md = ImageDraw.Draw(mascara)
+    for y in range(alto):
+        md.line([(0, y), (W, y)], fill=int(255 * min(1, max(0, 1 - (y - 640) / 560)) ** 1.2))
+    base.paste(arriba, (0, 0), mascara)
+    sombra = Image.new("L", (W, H), 0)
+    sd = ImageDraw.Draw(sombra)
+    for y in range(H):
+        sd.line([(0, y), (W, y)], fill=int(max(0, 1 - y / 520) * 100 + max(0, (y - 1380) / 540) * 130))
     base.paste(Image.new("RGB", (W, H), (4, 12, 30)), (0, 0), sombra)
     return base
 

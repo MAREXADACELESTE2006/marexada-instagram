@@ -75,7 +75,9 @@ def correr(script, args, etiqueta, avisos):
         return False
     if r.returncode != 0:
         ultima = ((r.stderr or r.stdout).strip().splitlines() or ["sin detalle"])[-1]
-        if TEMPORAL.search(ultima):
+        if re.search(r"HTTP Error 403|bloquea las peticiones", ultima):
+            avisos.append(f"{etiqueta}: rccelta.es bloquea las peticiones (HTTP 403 Forbidden); no es un fallo pasajero")
+        elif TEMPORAL.search(ultima):
             codigo = re.search(r"HTTP Error (\d{3})", ultima)
             LEVES.append(f"{etiqueta}: la web no respondía ({'HTTP ' + codigo.group(1) if codigo else 'sin respuesta'}); se reintenta sola en la próxima ejecución")
         else:

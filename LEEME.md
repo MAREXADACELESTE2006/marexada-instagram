@@ -1,7 +1,18 @@
-# Marexada Celeste · Instagram automático · v63
+# Marexada Celeste · Instagram automático · v65
 
 Diseños de partido + lector de la web del club (rccelta.es).
 Todavía NO descubre noticias nuevas solo ni publica en Instagram: eso es lo siguiente.
+
+## Novedades v65 (rccelta.es da «403 Forbidden»)
+- Síntoma: noticias, parte médico y entradas fallaban a la vez con `HTTP Error 403: Forbidden`. A diferencia del 502, un 403 no es una caída: la web rechaza la petición.
+- `red.py` ahora identifica todas las descargas como un navegador Chrome normal (cabeceras completas) en lugar de «compatible; MarexadaCeleste/1.0». Es lo primero que suelen filtrar las webs.
+- Si rccelta.es sigue respondiendo 403, el programa deja de insistir al segundo intento (no se martillea una web que nos bloquea) y avisa: «rccelta.es bloquea las peticiones (HTTP 403 Forbidden); no es un fallo pasajero».
+- Si tras esto sigue el 403, lo más probable es que bloqueen las IP de GitHub Actions y no el nombre del programa; en ese caso hay que cambiar desde dónde se descarga, no el código.
+
+## Novedades v64 (fondos propios)
+- Tres fotos nuevas en `assets/fondos/`: `fondo_victoria.jpg` (resultado con victoria del Celta, primer equipo), `fondo_inicio.jpg` (inicio de partido del Celta, primer equipo) y `fondo_europa.jpg` (todos los partidos de Europa League: previa, próximo partido, convocatoria, alineación, inicio, descanso y resultado).
+- Las fotos se colocan sin deformar (nítidas arriba, fundiéndose con el color de la competición hacia abajo). El resto de historias no cambia. Si en Europa League gana el Celta, manda la foto de Europa.
+- Para cambiar una foto, basta con sustituir el archivo por otro con el mismo nombre.
 
 ## Novedades v63
 - **«ESTA SEMANA NA HISTORIA CELESTE»**, todo automático. Cada miércoles (a partir de las 19:00) sale una **portada** y después **una historia por partido** (hasta 3). El programa busca solo en ESPN los partidos del Celta de temporadas pasadas que cumplen años esa semana (±3 días), de **Copa del Rey, Europa (Europa League/Champions) y LaLiga**, y elige los más interesantes: solo victorias del Celta; puntúan más Europa y Copa, las goleadas y los rivales grandes.

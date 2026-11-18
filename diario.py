@@ -38,7 +38,7 @@ HASHTAGS = "#RCCelta #Celta #MarexadaCeleste"
 RECORDATORIOS = {
     0: ["Noticia do día (mañá, de rccelta.es)"],
     1: ["Noticia do día (mañá, de rccelta.es)", "Celta Fortuna / cantera (tarde, de rccelta.es)"],
-    2: ["Noticia do día (mañá, de rccelta.es)", "Esta semana na historia celeste (tarde): sae soa (portada + partidos) se hai partidos históricos esta semana"],
+    2: ["Noticia do día (mañá, de rccelta.es)"],                  # a historia celeste das 19:00 sae soa (Almanaque Celta, v67)
     3: ["Noticia do día (mañá, de rccelta.es)"],
     4: ["Convocatoria (tarde, cando a publique o club)"],
     5: ["Aniversarios ou goleadores (mañá)", "Contido de peña: viaxe, merchandising, socios (tarde)"],
@@ -229,6 +229,25 @@ def crear_historia(datos, hoy, d_datos, avisos, offline=False, rapido=False):
     completas, va descargando y guardando en caché las temporadas pasadas para que el miércoles ya esté todo listo."""
     if rapido:
         return
+    import almanaque                                               # v67: las historias de los miércoles vienen del Excel (assets/almanaque.json)
+    try:
+        todas = almanaque.cargar()
+    except Exception as e:
+        todas = []
+        avisos.append(f"Almanaque: no se pudo leer assets/almanaque.json ({e})")
+    if hoy.weekday() == 2:
+        e = almanaque.entrada(hoy, todas)
+        if e:
+            for h in almanaque.historias(e):
+                nombre_f = f"almanaque_{h['pantalla']}.json"
+                with open(os.path.join(d_datos, nombre_f), "w", encoding="utf-8") as fh:
+                    json.dump(h, fh, ensure_ascii=False, indent=1)
+                datos[nombre_f] = h
+            return
+    else:
+        proximo = hoy + datetime.timedelta(days=(2 - hoy.weekday()) % 7)
+        if almanaque.entrada(proximo, todas):
+            return                                                 # el próximo miércoles ya está en el almanaque: no hace falta calentar la caché de ESPN
     import historia
     desde = os.path.join(BASE, "fixtures", "espn_historia_EJEMPLO.json") if offline else None
     if hoy.weekday() != 2:
@@ -291,6 +310,13 @@ def plan(hoy, datos, avisos):
         add(f"pronostico-{pr['_fecha']}", "pronostico_celta.json", "mañana", "10:00",
             f"🔮 PRONÓSTICO DA PEÑA: {loc} - {vis} ({pr['fecha_hora']}). Cal será o resultado? Responde coa túa aposta: "
             f"1 ({loc}) · X (empate) · 2 ({vis}) 💙 {etiquetas('celta')}")
+
+    for i in (1, 2, 3):                                           # v67: miércoles, Almanaque Celta: gancho, datos y cierre (a las 19:00, 19:02 y 19:04)
+        ah = datos.get(f"almanaque_{i}.json")
+        if not ah:
+            break
+        add(f"almanaque-{ah['_fecha']}-{i}", f"almanaque_{i}.json", "tarde", f"19:{(i - 1) * 2:02d}",
+            f"ESTA SEMANA NA HISTORIA CELESTE ({i}/3): {ah['titular']} 💙 {HASHTAGS}")
 
     cov = datos.get("historia_portada_hoy.json")                  # v63: miércoles, «Esta semana na historia celeste»: portada y después un partido por historia
     if cov:

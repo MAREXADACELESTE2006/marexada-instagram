@@ -1,7 +1,16 @@
-# Marexada Celeste · Instagram automático · v65
+# Marexada Celeste · Instagram automático · v67
 
 Diseños de partido + lector de la web del club (rccelta.es).
 Todavía NO descubre noticias nuevas solo ni publica en Instagram: eso es lo siguiente.
+
+## Novedades v67 (Almanaque Celta + escudos de Europa)
+- **Miércoles = Almanaque Celta.** Cada miércoles (a partir de las 19:00) salen **3 historias** con los textos del Excel «Almanaque Celta 48 meses»: 1) gancho, 2) datos (con marcador y escudos si es un partido) y 3) cierre con la pregunta para la afición. Cubre del 18/11/2026 al 13/11/2030 (209 miércoles). Hoy, 18/11/2026: «20 años de una victoria celeste en Riazor» (Deportivo 0-1 Celta).
+- El programa NO lee el Excel: lee `assets/almanaque.json` (228 KB). Si cambias textos en el Excel: `pip install openpyxl` y luego `python convertir_almanaque.py TuExcel.xlsx` (regenera el json) y sube el json.
+- Los textos salen tal cual están en el Excel (se quitan solo los emojis, que la tipografía no puede dibujar, y la pregunta final si ya está repetida en el recuadro).
+- Nuevo diseño `almanaque` en `generar_historia.py` (mismo fondo de «foto antigua» y marco que la portada de la historia celeste). Escudos de los dos equipos cuando el dato trae marcador o rival y el club tiene escudo; si no, solo el del Celta.
+- El buscador automático de partidos históricos en ESPN (v63) queda de reserva: solo se usa si un miércoles no está en el Excel. Mientras haya Excel ya no calienta su caché de lunes a martes.
+- **20 escudos nuevos** de equipos europeos (Arsenal, Aston Villa, Borussia Dortmund, Club Brugge, Fenerbahçe, Feyenoord, Galatasaray, Liverpool, Lille, Manchester United, PSV, Lens, Roma, Shakhtar, Slovan Bratislava, Slavia Praha, Sporting CP, VfB Stuttgart, AEK Atenas y Oporto), reducidos a 360 px y 128 colores como los que ya había: 244 KB en total (12 KB cada uno, en vez de 2,7 MB originales). Los otros 20 del paquete ya estaban y se han dejado como estaban.
+- No incluye la v66 (la de espaciar las consultas a rccelta.es): esta versión está hecha sobre la v65.
 
 ## Novedades v65 (rccelta.es da «403 Forbidden»)
 - Síntoma: noticias, parte médico y entradas fallaban a la vez con `HTTP Error 403: Forbidden`. A diferencia del 502, un 403 no es una caída: la web rechaza la petición.

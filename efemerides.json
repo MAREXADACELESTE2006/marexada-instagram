@@ -1,0 +1,102 @@
+[
+ {
+  "_leeme": "Lista de efemérides del Celta para la serie de los miércoles «TAL SEMANA COMA ESTA». Cada miércoles el programa publica (a las 19:00) la que cumpla años en esa semana (de 3 días antes a 3 días después). Para añadir una, copia un bloque, cambia los datos y pon \"revisada\": true cuando hayas comprobado fecha, resultado y goleadores. Las que no tengan \"revisada\": true NO se publican. 'local' y 'visitante' son los nombres de los escudos de assets/escudos (sin «-logo-footylogos.png»). 'logo': laliga, copa, europa o hypermotion."
+ },
+ {
+  "fecha": "2015-09-23",
+  "logo": "laliga",
+  "competicion_texto": "LaLiga · Balaídos",
+  "local": "celta-vigo",
+  "visitante": "fc-barcelona",
+  "local_nombre": "Celta",
+  "visitante_nombre": "Barcelona",
+  "goles_local": 4,
+  "goles_visitante": 1,
+  "frase": "Goleada ao Barça no Balaídos",
+  "goleadores_local": [
+   "Nolito 26'",
+   "Aspas 30', 56'",
+   "Guidetti 83'"
+  ],
+  "goleadores_visitante": [
+   "Neymar 80'"
+  ],
+  "revisada": true,
+  "fuentes": [
+   "ESPN (gameId 433931)",
+   "Sports Mole"
+  ]
+ },
+ {
+  "fecha": "2017-01-18",
+  "logo": "copa",
+  "competicion_texto": "Copa do Rei · Cuartos de final (ida)",
+  "local": "real-madrid",
+  "visitante": "celta-vigo",
+  "local_nombre": "Real Madrid",
+  "visitante_nombre": "Celta",
+  "goles_local": 1,
+  "goles_visitante": 2,
+  "frase": "Gañamos no Bernabéu",
+  "goleadores_local": [
+   "Marcelo 69'"
+  ],
+  "goleadores_visitante": [
+   "Aspas 64'",
+   "Jonny 70'"
+  ],
+  "revisada": true,
+  "fuentes": [
+   "ESPN (gameId 471747)"
+  ]
+ },
+ {
+  "fecha": "2017-01-25",
+  "logo": "copa",
+  "competicion_texto": "Copa do Rei · Cuartos de final (volta)",
+  "local": "celta-vigo",
+  "visitante": "real-madrid",
+  "local_nombre": "Celta",
+  "visitante_nombre": "Real Madrid",
+  "goles_local": 2,
+  "goles_visitante": 2,
+  "frase": "O Celta elimina ao Real Madrid",
+  "goleadores_local": [
+   "Danilo p.p. 44'",
+   "Wass 85'"
+  ],
+  "goleadores_visitante": [
+   "Cristiano 62'",
+   "Lucas Vázquez 90'"
+  ],
+  "revisada": true,
+  "fuentes": [
+   "Sports Mole"
+  ]
+ },
+ {
+  "fecha": "1998-11-24",
+  "logo": "europa",
+  "competicion_texto": "Copa da UEFA · Terceira rolda (ida)",
+  "local": "celta-vigo",
+  "visitante": "liverpool",
+  "local_nombre": "Celta",
+  "visitante_nombre": "Liverpool",
+  "goles_local": 3,
+  "goles_visitante": 1,
+  "frase": "Balaídos tombou ao Liverpool",
+  "goleadores_local": [
+   "Mostovoi 49'",
+   "Karpin 56'",
+   "Gudelj"
+  ],
+  "goleadores_visitante": [
+   "Owen 35'"
+  ],
+  "revisada": true,
+  "fuentes": [
+   "11v11",
+   "LFC History"
+  ]
+ }
+]

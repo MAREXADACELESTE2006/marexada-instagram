@@ -1,4 +1,4 @@
-"""Marexada Celeste · publicación AUTOMÁTICA de historias en Instagram (v59).
+"""Marexada Celeste · publicación AUTOMÁTICA de historias en Instagram (v61).
 
 Cómo funciona:
   1. diario.py genera las imágenes y llama a encolar(): la imagen se sube a la rama «imagenes» de este mismo repositorio (público) para que

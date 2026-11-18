@@ -1,7 +1,54 @@
-# Marexada Celeste · Instagram automático · v13
+# Marexada Celeste · Instagram automático · v63
 
 Diseños de partido + lector de la web del club (rccelta.es).
 Todavía NO descubre noticias nuevas solo ni publica en Instagram: eso es lo siguiente.
+
+## Novedades v63
+- **«ESTA SEMANA NA HISTORIA CELESTE»**, todo automático. Cada miércoles (a partir de las 19:00) sale una **portada** y después **una historia por partido** (hasta 3). El programa busca solo en ESPN los partidos del Celta de temporadas pasadas que cumplen años esa semana (±3 días), de **Copa del Rey, Europa (Europa League/Champions) y LaLiga**, y elige los más interesantes: solo victorias del Celta; puntúan más Europa y Copa, las goleadas y los rivales grandes.
+- Las de `efemerides.json` marcadas `"revisada": true` entran siempre y primero (son las comprobadas a mano).
+- **Foto de la portada**: se usa `assets/fondos/historia.jpg` (si no existe, una provisional).
+- Seguridad: los goleadores solo salen si cuadran con el marcador y no hay goles en propia puerta. Si ESPN no responde, no se inventa nada.
+- Nuevo `historia.py` y `fixtures/espn_historia_EJEMPLO.json` (para probar sin internet). La caché se guarda en `estado/historia_cache.json`: la primera vez se descargan las temporadas poco a poco (máx. 2 min por ejecución) y el miércoles solo publica cuando el histórico está completo.
+
+## Novedades v62 (rccelta.es caída: 502 / tiempo agotado)
+- Nuevo `red.py`: las descargas de rccelta.es (parte médico, entradas, noticias) reintentan 3 veces (pausas de 3 y 8 s) si la web devuelve 502/503/504 o no contesta.
+- Si sigue caída, se marca como «caída» y el resto de peticiones fallan al instante: antes `entradas.py` probaba decenas de direcciones y se cortaba a los 4 minutos («tardó demasiado»); ahora termina en ~11 s.
+- Los fallos pasajeros de la web ya no salen como «ERROR»: van en un apartado aparte («Fallos pasajeros de la web (no hay que hacer nada)») y no disparan por sí solos un mensaje de Telegram. Se reintentan solos en la siguiente ejecución.
+- Los errores definitivos (404, cambio de formato de la web…) se siguen avisando como antes.
+
+## Novedades v61
+- Menos brillo alrededor de los escudos (próximo partido, resultado y gol).
+- Cada equipo con su color también en el parte médico (Celta Fortuna = turquesa, aunque no lleve logo de competición) y en las clasificaciones: la fila destacada usa el color de la competición.
+- En los equipos/competiciones con color propio la foto de fondo se desatura un poco, así el turquesa, el lila, el rojo y el naranja se notan de verdad.
+- Bordes de las tarjetas (fecha, goleadores) en el color de la competición y viñeteado más suave para que el blanco de los títulos no se apague.
+
+## Novedades v60 (diseño de las historias)
+- **Color por competición**: LaLiga = celeste, Copa del Rey = rojo, Europa League = naranja, LaLiga Hypermotion (Celta Fortuna) = turquesa, AS Celtas femenino = lila. Cambia el fondo, los rótulos, las píldoras y el halo.
+- **Próximo partido**: cuenta atrás en píldora («FALTAN 3 DÍAS», «MAÑÁ», «HOXE», hasta 14 días antes), resplandor tras los escudos y «VS» más grande.
+- **Resultado**: marcador más grande con borde y resplandor, el que gana en el color de la competición y su escudo resaltado.
+- **Acabado en todas las historias**: sombra suave en los textos, halo de color arriba, viñeteado en los bordes y grano muy fino.
+- Para probar la cuenta atrás con otra fecha: `MAREXADA_HOY=2026-11-20 python generar.py datos_ejemplo/proximo_celta_EJEMPLO.json salida.jpg`.
+
+## Novedades v59
+- Arreglo en `instagram.py`: al crear por primera vez la rama «imagenes» daba el error `'default_branch'` (la prueba de v58 falló por eso; la publicación real habría fallado igual).
+  Ahora la rama se crea a partir del commit que ejecuta el workflow.
+
+## Novedades v58
+- **Prueba de publicación real** sin activar el diario: nuevo workflow «Prueba de Instagram» (`.github/workflows/prueba-instagram.yml`) y `python instagram.py --prueba`.
+  Publica UNA historia fija («PRUEBA DE PUBLICACIÓN») en la cuenta, aunque `IG_SIMULACRO=1`. Hay que escribir SI en la casilla de confirmación. No toca la cola ni el diario.
+
+## Novedades v57
+- **Publicación automática en Instagram** (historias): `instagram.py` + guía de montaje en `INSTAGRAM.md`. Las imágenes se alojan en la rama `imagenes` del repositorio (público),
+  se apuntan en `estado/cola_instagram.json` y se publican con la API oficial. Avisos por Telegram (✅ publicada, ⏱️ caducada, ❌ error). Modo prueba `IG_SIMULACRO=1` y freno `IG_PAUSA=1`.
+
+## Novedades v56
+- Arreglo del directo (goles, inicio y descanso): la lista de partidos del equipo en ESPN (`/schedule`) solo trae los ya terminados, por eso un partido en juego no se veía
+  (comprobado con el Albacete – Celta Fortuna del 16/11). Ahora `directo.py` mira además `/schedule?fixture=true` y el marcador de la liga (`/scoreboard`).
+- Nuevo `directo_log.txt` dentro de `salida/AAAA-MM-DD/datos/` (artifact «historias»): dice qué ha visto ESPN en cada revisión (eventos y estados), para comprobar el directo.
+
+## Novedades v55
+- El «Hoxe xogamos!» del día del partido (Celta, Fortuna, AS Celtas Fem) ya es una publicación independiente del «Mañá xogamos!»: antes, si el de «Mañá» ya había salido,
+  el del día del partido no salía. No sale si el partido ya ha empezado.
 
 ## Qué hay en el zip
 - `generar.py`: lee un JSON y crea la imagen (1080x1350, vertical de Instagram).
@@ -45,6 +92,133 @@ El texto se ajusta solo si hay nombres largos o más jugadores de lo normal.
   para la Europa League.
 - Fuente de datos: rccelta.es. Todo gratis (GitHub Actions + API oficial de Instagram,
   cuenta profesional).
+
+## Novedades v53
+- **Goles del Celta en directo («¡GOOOOOOL!»)**: vuelve la historia por gol (se quitó en v51), ahora con diseño propio: tu foto de la grada (`assets/fondos/fondo_gol.jpg`),
+  «¡GOOOOOOL!», goleador, minuto (con «de penalti» o «en propia puerta» si toca), marcador en ese momento con los dos escudos (el del equipo que marca, resaltado), logo de la
+  competición, «EN DIRECTO», logo de la peña y la web. Funciona en LaLiga, Copa del Rey (tono rojo) y Europa League (tono naranja). Solo salen los goles **del Celta**
+  (primer equipo); los del rival no se publican. Si hay dos goles entre dos revisiones salen las dos imágenes, cada una con su marcador. Un gol de hace más de 30 min de juego
+  no se saca (por si el programa estuvo parado). Un gol en propia puerta del rival cuenta como gol del Celta.
+- **Celta Fortuna en directo**: «COMIENZA EL PARTIDO» y «DESCANSO» (con marcador y goleadores de la primera parte), igual que el primer equipo. El final ya salía por `resultados.py`.
+  El Fortuna no lleva historia por gol.
+- `directo.py` ahora vigila los dos equipos (ESPN: LaLiga, Europa League, Copa y Hypermotion). Prueba sin internet: `python directo.py --desde fixtures/espn_directo_EJEMPLO.json --salida /tmp/prueba`.
+- Nuevo tipo de historia `gol` (`generar_historia.py`, función `gol`). Ejemplo: `datos_ejemplo/gol_celta_EJEMPLO.json` → `ejemplos/gol_celta_EJEMPLO.jpg`. Campos: `goleador`, `minuto`,
+  `goles_local`, `goles_visitante`, `lado` (`local`/`visitante`: quién marca), `modo` (`""`, `penalti` o `propia`) y `titulo` (opcional, por defecto «¡GOOOOOOL!»).
+- Arreglo: el Getafe (y otros clubes cuyo nombre en la base lleva «C.F») no salía con escudo cuando la fuente lo llamaba solo «Getafe».
+- Ojo con el retraso: el programa mira cada 15 min (30 min por la mañana), así que el gol puede salir con unos minutos de retraso. Para acortarlo, cambiar el `cron` de
+  `.github/workflows/diario.yml` a `*/5` (en un repositorio privado de GitHub gasta más minutos gratuitos al mes).
+
+## Novedades v52
+- Fondos distintos por tipo de historia (misma capa azul y mismo pie, solo cambia la foto): convocatoria y alineación → vestuario; parte médico → Ciudad Deportiva;
+  clasificación → mural de Balaídos; el resto sigue con la grada. Se configura en `FONDO_POR_TIPO` (`generar_historia.py`); fotos en `assets/fondos/fondo_*.jpg`.
+
+## Novedades v51
+- Directo del Celta simplificado: ya no hay publicación por gol. Solo salen (los días de partido del Celta, primer equipo): inicio del partido, descanso
+  (con marcador y goleadores de la primera parte; si se pasa el descanso entre revisiones se reconstruye con los goles ≤ 45') y el resultado final de siempre.
+
+## Novedades v50
+- Arreglo: el AS Celtas Fem ya no puede salir como «RESULTADO FINAL» al empezar el partido (marcador en directo 0-0). Se recuerda la hora de inicio
+  (`estado/agenda.json`) y no se da por terminado hasta 115 min después; además `besoccer.py` exige «FIN» en la página.
+- Nuevo `directo.py` (solo Celta, primer equipo): al empezar el partido saca «COMIENZA EL PARTIDO» y con cada gol «¡GOL!» con marcador y goleadores;
+  después sigue saliendo el resultado final de siempre. Se vigila cada 15 min (workflow `diario.yml`), así que llegan con un retraso de unos minutos.
+
+## Novedades v49
+- El mensaje de Telegram ya no lleva el «Control de actualidad» (ocupaba mucho texto). Sigue apareciendo completo en `resumen.md` (artifact `historias`).
+  Los avisos de error sí siguen llegando a Telegram.
+
+## Novedades v48
+- El pie alterna entre dos versiones, una por historia: escudo azul + letras, o letras + escudo rojo (nunca los dos a la vez). `LOGO_PIE` en
+  `generar_historia.py`: `"alternar"` (por defecto), `"azul"`, `"rojo"` o `"ambos"`.
+
+## Novedades v47
+- Pie simplificado: se quita el escudo rojo (sobrecargaba). Queda el escudo azul + letras MAREXADA CELESTE + la web. Para volver a verlo: `LOGO_PIE = "ambos"`.
+
+## Novedades v46
+- Nuevo pie de todas las imágenes (`_pie_marca` en `generar_historia.py`): escudo azul de la peña + letras MAREXADA CELESTE (más pequeñas) + escudo rojo,
+  los tres en la misma fila y con el escudo rojo centrado verticalmente con las letras. Logos más grandes.
+- Calidad: el logo de texto se ha separado en `assets/marca/logo_marexada_letras.png` y `logo_marexada_rojo.png` (recortes de `logo_marexada_texto.png`
+  sin reescalar) y cada logo se reduce una sola vez con LANCZOS desde su original grande.
+- `LOGO_PIE = "ambos"` (por defecto) enseña los dos escudos; con `"alternar"` sale un día solo el azul y otro solo el rojo (nunca los dos).
+
+## Novedades v28
+- Se quita el `diario.yml` suelto de la carpeta principal del ZIP (era una copia vieja que confundía): el archivo que vale es SOLO `.github/workflows/diario.yml`.
+  GitHub únicamente ejecuta los archivos de esa carpeta. Tiempo máximo de cada ejecución: 5 minutos.
+
+## Novedades v27
+- ARREGLO IMPORTANTE: el programa no leía la fecha de las noticias de rccelta.es (salía `_fecha: null`) y por eso las convocatorias y las crónicas
+  NO llegaban a publicarse. Ahora `noticias.py` tolera «RC Celta 12-noviembre-2026» pegado o separado, prueba también los metadatos de la página
+  y avisa en el resumen si una noticia no tiene fecha o no se puede interpretar. `CANDIDATA` ya no exige que la convocatoria empiece el título.
+- `diario.py`: si una convocatoria no trae fecha de noticia, vale si el partido es hoy, mañana o pasado mañana (fecha del partido del propio texto).
+- Ejecuciones rápidas más espaciadas: cada 30 minutos (10:05-14:35 y, de jueves a lunes, 15:05-23:35, horas de invierno). Consumo orientativo: unos 29 minutos
+  de Actions al día (≈ 880 al mes de los 2.000 gratuitos).
+
+## Novedades v26
+- MODO RÁPIDO (`python diario.py --modo rapido`): solo convocatorias y resultados (fuentes: calendario, noticias de rccelta.es, resultados y AS Celtas).
+  Se ejecuta cada 15 minutos de 10:00 a 14:45 (convocatorias) y cada 20 minutos de 15:00 a 23:40, de jueves a lunes (resultados), horas de invierno.
+  Antes de gastar tiempo mira `estado/agenda.json`: si no hay partido de nadie entre ayer y dentro de 2 días, termina enseguida.
+  En modo rápido Telegram manda SOLO la foto con su texto (con ⚡ delante), sin el resumen, y no avisa de errores (esos salen en las completas).
+- Ejecuciones COMPLETAS (parte médico, entradas, cumpleaños, clasificaciones, resumen del día): 07:00, 17:30 y 23:30 (invierno) y al pulsar Run workflow.
+- `estado/agenda.json`: fechas de los partidos cercanos; la crea la primera ejecución completa y la actualizan todas.
+- `diario.yml`: una sola ejecución a la vez (concurrency), caché de pip y `estado/` completo en el commit.
+- `plantillas/esta_semana_na_historia_celeste_EJEMPLO.json`: plantilla de la portada de la serie de los miércoles (solo cambian los datos cada semana).
+- Consumo orientativo: unos 45 minutos de GitHub Actions al día (≈1.350 al mes; el plan gratuito de un repositorio privado trae 2.000).
+
+## Novedades v25
+- El pronóstico da peña tiene diseño PROPIO, verde, para distinguirlo del resto (fondo `assets/fondos/pronostico_verde.jpg` con el escudo «Sempre Celta · dende 1923»):
+  título grande, escudos, píldora menta con día y hora, «Cal será o resultado?» y tres círculos 1 · X · 2 con el nombre de cada opción.
+  La gente responde a la historia o comenta con 1, X o 2 (no depende de las pegatinas de Instagram). El texto sugerido lo dice así.
+
+## Novedades v24
+- Pronóstico da peña (`generar_historia.py` tipo `pronostico`, `diario.py`): los VIERNES, si el Celta juega de viernes a lunes, sale una historia con los dos
+  escudos y «Cal será o resultado?». Se crea a partir del calendario oficial (`proximo_celta.json`). El texto sugerido trae las opciones de la enquisa:
+  1 (local) · X (empate) · 2 (visitante). La pegatina de enquisa de Instagram la pone la persona al subir la historia (la imagen deja libre la zona de abajo).
+- Nuevo tipo `efemeride` (partido histórico, serie «Tal semana coma esta»): SOLO para hacerlo a mano; no está en el programa diario.
+- El pronóstico pasa por el control de actualidad (el partido no puede haberse jugado y el texto no usa «hoxe/mañá»).
+
+## Novedades v23
+- CONTROL DE ACTUALIDAD obligatorio antes de generar la imagen de entradas (`diario.py`, `entradas.py`):
+  1. fecha de la noticia: se guarda cuándo se publicó; solo se avisa de noticias de los últimos 2 días;
+  2. fecha del partido: si ya se jugó, se descarta; si la noticia no trae fecha se contrasta con el calendario (próximo partido); si no se puede confirmar, se descarta;
+  3. estado actual: la noticia se vuelve a descargar de rccelta.es justo antes de generar la imagen (se guarda la hora de la comprobación);
+  4. lenguaje temporal: «hoy», «desde hoy», «mañana», «últimas horas»... se convierten en la fecha real de la noticia o la frase no se usa.
+  El resultado de cada comprobación sale en `resumen.md`, apartado «Control de actualidad» (OK o DESCARTADA con el motivo).
+- Entradas con el diseño de la competición: logo y colores de Copa del Rey (rojo), Europa League (naranja), LaLiga e Hypermotion; escudo del Salamanca UDS.
+- Parte médico rediseñado: escudo del Celta arriba, filete con cruz, barra de acento, días de baja, fecha de actualización en gallego y 6 jugadores por imagen.
+- Cumpleaños: la fecha va escrita («19 de novembro»), sin «hoxe».
+
+## Novedades v22
+- `cumpleanos.py` + `cumpleanos.json`: historia «FELIZ ANIVERSARIO» el día que cumple años un jugador o miembro del cuerpo técnico del Celta o del
+  Celta Fortuna (edad en un círculo grande, nombre y posición). Los datos están en `cumpleanos.json`; para añadir o corregir a alguien se edita
+  ese archivo en GitHub. Las líneas con `"pendiente": true` no se usan (Hugo Burcio, hasta confirmar su fecha: 22/05/2006 o 31/10/2006).
+- Entradas: ahora con los escudos de los dos equipos (como el resto de historias) y, si el Celta o el Fortuna juegan fuera, el título
+  pasa a «ENTRADAS VISITANTES» (también si la noticia habla de visitantes o desplazamiento). Si un rival no tiene escudo en `assets/escudos`,
+  sale con sus siglas.
+
+## Novedades v21
+- `entradas.py`: avisa de las noticias de ENTRADAS del Celta y del Celta Fortuna que publica el club en https://rccelta.es/club/actualidad/<noticia>/
+  (ejemplo: `entradas-celta-fortuna-real-valladolid`). La lista de la página de actualidad se carga con JavaScript, así que busca las noticias
+  por la API de WordPress (`/wp-json/wp/v2/search?search=entradas`), por el mapa del sitio (sitemap) y por los enlaces de la página y de
+  «Noticias recomendadas». Solo noticias de los últimos 8 días, de partidos que aún no se han jugado, sin As Celtas ni femenino ni canteira.
+  Lee el partido, la jornada, la fecha y hasta 3 puntos (venta general y precio, prioridad de carnés, canje) y escribe `entradas_<noticia>.json`.
+- Nuevo tipo de historia `entradas` (`generar_historia.py`). Ejemplo: `ejemplos/ejemplo_entradas_fortuna_valladolid.jpg`.
+- `diario.py`: una historia por cada noticia de entradas nueva (la clave es el nombre de la noticia), con el enlace en el texto sugerido.
+- SIN PROBAR con internet real: de las tres formas de encontrar la lista, ninguna se ha podido comprobar desde aquí. Si fallan, sale un aviso
+  «ERROR entradas» en `resumen.md` y se guarda `entradas_DEBUG.txt` en `datos/` con lo que probó cada una.
+
+## Novedades v20
+- `partemedico.py`: parte médico del Celta y del Celta Fortuna desde rccelta.es (`/equipos/primer-equipo/parte-medico/` y `/equipos/celta-fortuna/parte-medico/`).
+  Lee cada lesionado (nombre, fecha de lesión, diagnóstico, observaciones) y escribe `partemedico_celta.json` y `partemedico_fortuna.json`
+  (7 lesionados por imagen; si hay más, `_2`, `_3`...). Si el parte está vacío, sale una historia «Sen baixas por lesión».
+- Nuevo tipo `partemedico` (diseño historia 1080x1920, `generar_historia.py`). Ejemplo: `ejemplos/real_partemedico_celta.jpg`
+  (datos del parte del Celta del 07/11/2026; el del Fortuna de `fixtures/` es inventado).
+- `diario.py`: la historia del parte médico sale solo cuando el parte cambia (entra o sale alguien o cambia un diagnóstico; la «firma» del JSON).
+  La primera vez saldrá el parte actual del Celta y del Fortuna.
+- `diario.py`: Telegram avisa cuando hay historias nuevas o algún aviso de error, y además manda el resumen del día (con el contenido propio que
+  toca hoy: noticia del día, efeméride...) UNA vez, en la primera ejecución de la mañana (de 05:00 a 13:00 hora de Madrid), o siempre que lances el
+  trabajo a mano con Run workflow. Si Telegram falla, no se anota nada como hecho y se reintenta en la siguiente ejecución.
+- `diario.yml`: ahora corre 6 veces al día (07:00, 13:00, 18:30, 20:00, 22:00 y 23:30 hora de invierno, aprox.).
+- Probado con copias REALES de las dos páginas del parte (`fixtures/partemedico_REAL/`, descargadas por GitHub el 11/11/2026): los datos vienen en el HTML,
+  no hace falta JavaScript. Si la página en español no existe, el programa prueba la gallega y la inglesa (los diagnósticos saldrían en inglés).
 
 ## Novedades v13
 - `noticias.py`: convocatorias y crónicas del Celta y del Celta Fortuna desde rccelta.es, sin ayuda manual. Las páginas de categoría de la web

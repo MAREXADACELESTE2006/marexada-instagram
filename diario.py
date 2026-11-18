@@ -1,4 +1,4 @@
-"""Marexada Celeste · programa diario de historias de Instagram (v20) — MODO REVISIÓN.
+"""Marexada Celeste · programa diario de historias de Instagram (v63) — MODO REVISIÓN.
 
 Cada día (lo ejecuta GitHub Actions, ver INSTALAR.md) este programa:
   1. lee las fuentes: noticias de rccelta.es (convocatorias y crónicas), calendario y resultados del Celta/Fortuna (ESPN/TheSportsDB), clasificaciones y AS Celtas Fem (besoccer);
@@ -38,7 +38,7 @@ HASHTAGS = "#RCCelta #Celta #MarexadaCeleste"
 RECORDATORIOS = {
     0: ["Noticia do día (mañá, de rccelta.es)"],
     1: ["Noticia do día (mañá, de rccelta.es)", "Celta Fortuna / cantera (tarde, de rccelta.es)"],
-    2: ["Noticia do día (mañá, de rccelta.es)", "Efeméride (tarde, contido propio)"],
+    2: ["Noticia do día (mañá, de rccelta.es)", "Esta semana na historia celeste (tarde): sae soa (portada + partidos) se hai partidos históricos esta semana"],
     3: ["Noticia do día (mañá, de rccelta.es)"],
     4: ["Convocatoria (tarde, cando a publique o club)"],
     5: ["Aniversarios ou goleadores (mañá)", "Contido de peña: viaxe, merchandising, socios (tarde)"],
@@ -61,6 +61,12 @@ def fecha_de(d):
         return None
 
 
+# v62: fallos PASAJEROS de una web (502, 503, 504, tiempo agotado, «no responde»): no son un error del programa. Van aparte (LEVES),
+# se muestran en el resumen pero no disparan por sí solos un mensaje de Telegram, y se reintentan solos en la siguiente ejecución.
+TEMPORAL = re.compile(r"HTTP Error (?:408|429|5\d\d)|Bad Gateway|Service Unavailable|Gateway Time-?out|no responde|timed out|Temporary failure", re.I)
+LEVES = []
+
+
 def correr(script, args, etiqueta, avisos):
     try:
         r = subprocess.run([sys.executable, os.path.join(BASE, script), *args], capture_output=True, text=True, timeout=240)
@@ -69,7 +75,11 @@ def correr(script, args, etiqueta, avisos):
         return False
     if r.returncode != 0:
         ultima = ((r.stderr or r.stdout).strip().splitlines() or ["sin detalle"])[-1]
-        avisos.append(f"{etiqueta}: {ultima}")
+        if TEMPORAL.search(ultima):
+            codigo = re.search(r"HTTP Error (\d{3})", ultima)
+            LEVES.append(f"{etiqueta}: la web no respondía ({'HTTP ' + codigo.group(1) if codigo else 'sin respuesta'}); se reintenta sola en la próxima ejecución")
+        else:
+            avisos.append(f"{etiqueta}: {ultima}")
     return r.returncode == 0
 
 
@@ -211,6 +221,34 @@ def crear_pronostico(datos, hoy, d_datos):
     datos["pronostico_celta.json"] = pr
 
 
+def crear_historia(datos, hoy, d_datos, avisos, offline=False, rapido=False):
+    """v63: «ESTA SEMANA NA HISTORIA CELESTE». Los miércoles: portada + una historia por cada partido histórico del Celta que cumple años esta
+    semana (lo busca solo historia.py en ESPN, más las de efemerides.json marcadas como revisadas). El resto de días, y solo en las ejecuciones
+    completas, va descargando y guardando en caché las temporadas pasadas para que el miércoles ya esté todo listo."""
+    if rapido:
+        return
+    import historia
+    desde = os.path.join(BASE, "fixtures", "espn_historia_EJEMPLO.json") if offline else None
+    if hoy.weekday() != 2:
+        if not offline:
+            try:
+                historia.partidos(hoy, None, [])
+            except Exception as e:
+                print(f"aviso: historia (calentar caché): {e}", file=sys.stderr)
+        return
+    try:
+        ps, cov = historia.elegir(hoy, desde, avisos)
+    except Exception as e:
+        avisos.append(f"Historia: {e}")
+        return
+    if not ps:
+        return
+    for nombre_f, d in [("historia_portada_hoy.json", cov)] + [(f"historia_partido_{i}.json", x) for i, x in enumerate(ps, 1)]:
+        with open(os.path.join(d_datos, nombre_f), "w", encoding="utf-8") as fh:
+            json.dump(d, fh, ensure_ascii=False, indent=1)
+        datos[nombre_f] = d
+
+
 def plan(hoy, datos, avisos):
     """Devuelve una lista de historias: clave (para no repetir), fichero de datos, momento, hora sugerida y texto."""
     wd = hoy.weekday()
@@ -251,6 +289,19 @@ def plan(hoy, datos, avisos):
         add(f"pronostico-{pr['_fecha']}", "pronostico_celta.json", "mañana", "10:00",
             f"🔮 PRONÓSTICO DA PEÑA: {loc} - {vis} ({pr['fecha_hora']}). Cal será o resultado? Responde coa túa aposta: "
             f"1 ({loc}) · X (empate) · 2 ({vis}) 💙 {etiquetas('celta')}")
+
+    cov = datos.get("historia_portada_hoy.json")                  # v63: miércoles, «Esta semana na historia celeste»: portada y después un partido por historia
+    if cov:
+        add(f"historia-portada-{hoy.isoformat()}", "historia_portada_hoy.json", "tarde", "19:00",
+            f"ESTA SEMANA NA HISTORIA CELESTE: {cov['tema'].capitalize()}. Desliza para ver os partidos 💙 {HASHTAGS}")
+        for i in range(1, 6):
+            hp = datos.get(f"historia_partido_{i}.json")
+            if not hp:
+                break
+            nl, nv = nombre_lado(hp, "local"), nombre_lado(hp, "visitante")
+            n = hp["titulo"].split()[1]
+            add(f"historia-{hp['_fecha']}-{re.sub(r'[^a-z0-9]+', '-', (nl + '-' + nv).lower()).strip('-')}", f"historia_partido_{i}.json", "tarde", f"19:{i * 2:02d}",
+                f"Hai {n} {'ano' if hp['titulo'].endswith('ANO') else 'anos'}: {nl} {hp['goles_local']} - {hp['goles_visitante']} {nv} ({hp.get('competicion_texto', '')}). 💙 {HASHTAGS}")
 
     def corto(d):
         return re.sub(r"[^a-z0-9]+", "-", (d.get("_url") or "").rstrip("/").split("/")[-1].lower())[:60]
@@ -460,6 +511,7 @@ def main():
 
     datos = {f: cargar(os.path.join(d_datos, f)) for f in os.listdir(d_datos) if f.endswith(".json")}
     crear_pronostico(datos, hoy, d_datos)
+    crear_historia(datos, hoy, d_datos, avisos, offline=a.offline, rapido=rapido)
     if not a.offline and not a.sin_estado:
         try:
             guardar_agenda(datos, hoy)
@@ -518,6 +570,9 @@ def main():
     if avisos:
         L += ["", "## Avisos"] + [f"- {x}" for x in avisos]
         L_tg += ["", "## Avisos"] + [f"- {x}" for x in avisos]
+    if LEVES:
+        L += ["", "## Fallos pasajeros de la web (no hay que hacer nada)"] + [f"- {x}" for x in LEVES]
+        L_tg += ["", "## Fallos pasajeros de la web (no hay que hacer nada)"] + [f"- {x}" for x in LEVES]
     resumen = "\n".join(L) + "\n"
     resumen_tg = "\n".join(L_tg) + "\n"
     open(os.path.join(carpeta, "resumen.md"), "w", encoding="utf-8").write(resumen)

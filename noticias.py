@@ -42,8 +42,8 @@ def descargar(url, desde=None):
                 return open(ruta, encoding="utf-8").read()
         raise FileNotFoundError(f"{nombre}.html (en {desde})")
     req = urllib.request.Request(url, headers={"user-agent": "Mozilla/5.0 (compatible; MarexadaCeleste/1.0)", "accept-language": "es"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return r.read().decode("utf-8", errors="replace")
+    import red                                         # v62: reintentos y aviso claro si la web está caída
+    return red.abrir(req, timeout=20).decode("utf-8", errors="replace")
 
 
 def sin_etiquetas(t):

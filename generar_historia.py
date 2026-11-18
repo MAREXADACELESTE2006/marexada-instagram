@@ -1059,7 +1059,7 @@ def historia_portada(datos):
 # ---------------------------------------------------------------- tal semana coma esta (partido histórico)
 def efemeride(datos):
     img = fondo(); d = ImageDraw.Draw(img)
-    serie = datos.get("serie", "TAL SEMANA COMA ESTA")
+    serie = datos.get("serie", "ESTA SEMANA NA HISTORIA CELESTE")
     center(d, 140, serie, fit(d, serie, 44, W - 80, 28), fill=AZUL)
     center(d, 205, datos["titulo"], fit(d, datos["titulo"], 86, W - 100), fill=WHITE)
     y = 430

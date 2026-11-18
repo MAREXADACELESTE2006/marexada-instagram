@@ -107,8 +107,8 @@ def descargar(url, desde=None):
         raise FileNotFoundError(nombre)
     req = urllib.request.Request(url, headers={"user-agent": "Mozilla/5.0 (compatible; MarexadaCeleste/1.0)", "accept-language": "es",
                                                "accept": "text/html,application/xhtml+xml,application/xml,application/json;q=0.9,*/*;q=0.8"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return r.read().decode("utf-8", errors="replace")
+    import red                                         # v62: reintentos y aviso claro si la web está caída
+    return red.abrir(req, timeout=20).decode("utf-8", errors="replace")
 
 
 def _nombre(url):

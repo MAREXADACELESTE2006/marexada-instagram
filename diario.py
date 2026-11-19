@@ -445,7 +445,8 @@ def plan(hoy, datos, avisos):
             continue
         quien = f"o noso adestrador {c['nombre']}" if "adestrador" in (c.get("posicion") or "").lower() else c["nombre"]
         add(f"cumple-{fichero[10:-5]}-{c.get('año', hoy.year)}", fichero, "mañana", "09:00",
-            f"🎂 O {c['fecha']} cumpre {c['edad']} anos {quien}! Moitas felicidades e que cumpra moitos máis co celeste no peito 💙 {etiquetas(c.get('equipo', 'celta'))}")
+            f"🎂 O {c['fecha']} cumpre {c['edad']} anos {quien}! Moitas felicidades e que cumpra moitos máis co celeste no peito 💙 {etiquetas(c.get('equipo', 'celta'))}"
+            + (" 📸 Fotos: Web oficial del RC Celta (@rccelta)" if c.get("foto") else ""))      # v72: crédito obligatorio cuando se usa la foto del club
     return out
 
 

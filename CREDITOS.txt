@@ -3,3 +3,4 @@ respectivos clubes, competiciones y federaciones.
 Tipografías: Poppins, Big Shoulders y Lora (SIL Open Font License; las licencias están en assets/fuentes).
 Fotos de fondo: aportadas por la peña Marexada Celeste.
 Tesouros Celestes: foto histórica y recorte de periódico aportados por la peña Marexada Celeste.
+Caras de los jugadores (cumpleaños): Web oficial del RC Celta (@rccelta). Hay que mencionarlo siempre al usarlas (la imagen y el texto ya lo incluyen).

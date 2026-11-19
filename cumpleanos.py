@@ -1,4 +1,4 @@
-"""Marexada Celeste · cumpleaños de la plantilla (v22).
+"""Marexada Celeste · cumpleaños de la plantilla (v22; v72: con la cara del jugador si hay foto).
 
 Lee cumpleanos.json (jugadores y cuerpo técnico del Celta y del Celta Fortuna, con su fecha de nacimiento) y, si hoy cumple años
 alguien, escribe en la carpeta de salida:
@@ -22,7 +22,7 @@ TAG = {"celta": "REAL CLUB CELTA", "fortuna": "CELTA FORTUNA"}
 
 
 def slug(t):
-    t = unicodedata.normalize("NFKD", t.lower()).encode("ascii", "ignore").decode()
+    t = unicodedata.normalize("NFKD", t.lower().replace("ı", "i")).encode("ascii", "ignore").decode()
     return re.sub(r"[^a-z0-9]+", "-", t).strip("-")
 
 
@@ -58,6 +58,9 @@ def main():
         d = {"tipo": "cumpleanos", "competicion": "liga", "tag": TAG.get(p.get("equipo"), "REAL CLUB CELTA"), "nombre": p["nombre"],
              "posicion": p.get("posicion", ""), "edad": hoy.year - n.year, "fecha": f"{hoy.day} de {MESES_GL[hoy.month - 1]}",
              "equipo": p.get("equipo", "celta"), "año": hoy.year}
+        foto = os.path.join("assets", "caras", slug(p["nombre"]) + ".webp")       # v72: cara de la web del club, si la hay (assets/caras/<nombre>.webp)
+        if os.path.exists(os.path.join(BASE, foto)):
+            d["foto"] = foto.replace(os.sep, "/")
         with open(os.path.join(a.salida, f"cumpleanos_{slug(p['nombre'])}.json"), "w", encoding="utf-8") as f:
             json.dump(d, f, ensure_ascii=False, indent=1)
         hechos.append(f"{p['nombre']} ({d['edad']})")

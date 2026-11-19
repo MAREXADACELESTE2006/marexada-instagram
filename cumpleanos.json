@@ -203,9 +203,7 @@
    "nombre": "Hugo Burcio",
    "posicion": "Centrocampista",
    "equipo": "celta",
-   "nacimiento": "2006-05-22",
-   "pendiente": true,
-   "nota": "PENDIENTE: la lista del primer equipo dice 22/05/2006 y la del Fortuna 31/10/2006. Quita la línea \"pendiente\" cuando sepas cuál es la buena."
+   "nacimiento": "2006-10-31"
   }
  ]
 }

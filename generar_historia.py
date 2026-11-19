@@ -10,7 +10,7 @@ import math
 import os
 import re
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(BASE, "assets")
@@ -1131,30 +1131,95 @@ def entradas(datos):
 
 
 # ---------------------------------------------------------------- cumpleaños
+def _cara(datos):
+    """Cara del jugador (recorte con fondo transparente, de la web del club) o None si no hay foto."""
+    ruta = datos.get("foto")
+    if not ruta:
+        return None
+    ruta = ruta if os.path.isabs(ruta) else os.path.join(os.path.dirname(ASSETS), ruta)
+    try:
+        return Image.open(ruta).convert("RGBA")
+    except Exception:
+        return None
+
+
+def _credito_fotos(img, y):
+    """«📸 Fotos: Web oficial del RC Celta (@rccelta)», con la cámara dibujada (la tipografía no tiene emojis)."""
+    d = ImageDraw.Draw(img)
+    txt = "Fotos: Web oficial del RC Celta (@rccelta)"
+    f = fit(d, txt, 34, W - 200, 22)
+    tw = d.textlength(txt, font=f)
+    x0 = (W - (tw + 54)) / 2
+    c = (200, 220, 242)
+    d.rounded_rectangle([x0, y + 8, x0 + 36, y + 32], 6, outline=c, width=3)
+    d.rectangle([x0 + 9, y + 3, x0 + 20, y + 9], fill=c)
+    d.ellipse([x0 + 11, y + 14, x0 + 25, y + 28], outline=c, width=3)
+    d.text((x0 + 54, y + 20 - f.size * 0.7), txt, font=f, fill=c)
+
+
 def cumpleanos(datos):
+    cara = _cara(datos)
     img = fondo(); d = ImageDraw.Draw(img)
     cabecera(img, d, datos.get("tag", ""), "FELIZ ANIVERSARIO", None, ytitulo=205)
-    cx, cy, r = W // 2, 640, 230
-    sombra = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ImageDraw.Draw(sombra).ellipse([cx - r + 6, cy - r + 16, cx + r + 6, cy + r + 16], fill=(0, 0, 0, 90))
-    sombra = sombra.filter(ImageFilter.GaussianBlur(12))
-    img.paste(sombra, (0, 0), sombra)
-    d = ImageDraw.Draw(img)
-    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=AZUL)
-    d.ellipse([cx - r + 14, cy - r + 14, cx + r - 14, cy + r - 14], outline=WHITE, width=6)
     edad = str(datos.get("edad", ""))
-    fe = font(250 if len(edad) < 3 else 190)
-    bb = d.textbbox((0, 0), edad, font=fe)
-    d.text((cx - (bb[0] + bb[2]) / 2, cy - 45 - (bb[1] + bb[3]) / 2), edad, font=fe, fill=(10, 35, 57))
-    center(d, cy + 105, "ANOS", font(62), fill=(10, 35, 57), x=cx)
-    y = 960
-    for l in _lineas(d, datos.get("nombre", ""), font(96), W - 100, 2):
-        center(d, y, l, fit(d, l, 96, W - 100, 50)); y += 112
-    if datos.get("posicion"):
-        center(d, y + 10, datos["posicion"], fit(d, datos["posicion"], 46, W - 120, 28), fill=AZUL); y += 80
-    if datos.get("fecha"):
-        center(d, y + 30, f"{datos['fecha']}", font(50), fill=(200, 218, 240)); y += 90
-    center(d, max(y + 60, 1380), "Parabéns da Marexada Celeste!", fit(d, "Parabéns da Marexada Celeste!", 52, W - 100, 30))
+    if cara is None:                                                      # sin foto: el diseño de siempre (círculo grande con la edad)
+        cx, cy, r = W // 2, 640, 230
+        sombra = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        ImageDraw.Draw(sombra).ellipse([cx - r + 6, cy - r + 16, cx + r + 6, cy + r + 16], fill=(0, 0, 0, 90))
+        sombra = sombra.filter(ImageFilter.GaussianBlur(12))
+        img.paste(sombra, (0, 0), sombra)
+        d = ImageDraw.Draw(img)
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=AZUL)
+        d.ellipse([cx - r + 14, cy - r + 14, cx + r - 14, cy + r - 14], outline=WHITE, width=6)
+        fe = font(250 if len(edad) < 3 else 190)
+        bb = d.textbbox((0, 0), edad, font=fe)
+        d.text((cx - (bb[0] + bb[2]) / 2, cy - 45 - (bb[1] + bb[3]) / 2), edad, font=fe, fill=(10, 35, 57))
+        center(d, cy + 105, "ANOS", font(62), fill=(10, 35, 57), x=cx)
+        y = 960
+    else:                                                                 # con foto: el jugador «sale» del círculo y la edad va en una insignia
+        cx, cy, r = W // 2, 745, 240
+        sombra = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        ImageDraw.Draw(sombra).ellipse([cx - r + 6, cy - r + 16, cx + r + 6, cy + r + 16], fill=(0, 0, 0, 100))
+        sombra = sombra.filter(ImageFilter.GaussianBlur(14))
+        img.paste(sombra, (0, 0), sombra)
+        d = ImageDraw.Draw(img)
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=AZUL)
+        d.ellipse([cx - r + 14, cy - r + 14, cx + r - 14, cy + r - 14], outline=WHITE, width=6)
+        alto = 670
+        cara = cara.resize((round(cara.width * alto / cara.height), alto), Image.LANCZOS)
+        masc = Image.new("L", (W, H), 0)                                  # visible: el círculo y todo lo que queda por encima de su centro (la cabeza sobresale)
+        md = ImageDraw.Draw(masc)
+        md.ellipse([cx - r + 7, cy - r + 7, cx + r - 7, cy + r - 7], fill=255)
+        md.rectangle([0, 0, W, cy], fill=255)
+        capa = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        capa.paste(cara, (cx - cara.width // 2, cy + r - 16 - alto), cara)
+        capa.putalpha(ImageChops.multiply(capa.getchannel("A"), masc))
+        img.paste(capa, (0, 0), capa)
+        d = ImageDraw.Draw(img)
+        bx, by, br = cx + 200, cy + 182, 100                              # insignia con la edad
+        d.ellipse([bx - br - 6, by - br - 6, bx + br + 6, by + br + 6], fill=WHITE)
+        d.ellipse([bx - br, by - br, bx + br, by + br], fill=(10, 35, 57))
+        fe = font(124 if len(edad) < 3 else 90)
+        bb = d.textbbox((0, 0), edad, font=fe)
+        d.text((bx - (bb[0] + bb[2]) / 2, by - 22 - (bb[1] + bb[3]) / 2), edad, font=fe, fill=WHITE)
+        center(d, by + 34, "ANOS", font(34), fill=AZUL, x=bx)
+        y = 1050
+    lineas = _lineas(d, datos.get("nombre", ""), font(96), W - 100, 2)
+    tam = 96 if len(lineas) == 1 else 84
+    for l in lineas:
+        center(d, y, l, fit(d, l, tam, W - 100, 50)); y += int(tam * 1.17)
+    if cara is None:
+        if datos.get("posicion"):
+            center(d, y + 10, datos["posicion"], fit(d, datos["posicion"], 46, W - 120, 28), fill=AZUL); y += 80
+        if datos.get("fecha"):
+            center(d, y + 30, f"{datos['fecha']}", font(50), fill=(200, 218, 240)); y += 90
+        center(d, max(y + 60, 1380), "Parabéns da Marexada Celeste!", fit(d, "Parabéns da Marexada Celeste!", 52, W - 100, 30))
+    else:                                                                 # con foto: posición y fecha en una sola línea, para que quepa también con nombres largos
+        meta = " · ".join(x for x in (datos.get("posicion"), datos.get("fecha")) if x)
+        if meta:
+            center(d, y + 4, meta, fit(d, meta, 44, W - 120, 26), fill=AZUL); y += 64
+        center(d, max(y + 34, 1325), "Parabéns da Marexada Celeste!", fit(d, "Parabéns da Marexada Celeste!", 52, W - 100, 30))
+        _credito_fotos(img, 1408)
     pie(img, d)
     return img
 

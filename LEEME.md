@@ -1,7 +1,20 @@
-# Marexada Celeste · Instagram automático · v71
+# Marexada Celeste · Instagram automático · v73
 
 Diseños de partido + lector de la web del club (rccelta.es).
 Todavía NO descubre noticias nuevas solo ni publica en Instagram: eso es lo siguiente.
+
+## Novedades v73 (las 10 caras que faltaban y la fecha de Hugo Burcio)
+- **Hugo Burcio cumple el 31/10/2006** (se quita «pendiente» de `cumpleanos.json`): ya sale en las historias de cumpleaños el 31 de octubre, con su foto.
+- **10 caras nuevas** en `assets/caras/` (394 KB en WebP; los PNG pesaban 3 MB): Andrés Antañón, Caio Barone, Coke Carrillo, Couhaib Driouech, Hugo Álvarez, Joel López, Óscar Marcos, Stefan Bajcetic, Williot Swedberg y **Hugo González** (el archivo se llamaba solo «hugo.png»; se ha asignado a Hugo González por descarte, porque Hugo Álvarez y Hugo Burcio tienen su propio archivo).
+- Ya hay foto de **33 de las 34 personas** de `cumpleanos.json`. Solo falta **Fredi Álvarez** (adestrador del Fortuna), que sigue saliendo con el diseño de siempre (círculo con la edad) y sin crédito.
+- Se han generado las 34 historias de cumpleaños de prueba (con foto y sin ella) sin errores; los nombres largos caben.
+
+## Novedades v72 (caras de los jugadores en los cumpleaños)
+- Las historias de **cumpleaños** llevan ahora la cara del jugador (recortes de la web oficial del RC Celta): el jugador sale de un círculo celeste, la edad va en una insignia y debajo van el nombre, la posición con la fecha y «Parabéns da Marexada Celeste!».
+- **Crédito obligatorio:** cuando se usa una foto, la imagen lleva abajo «Fotos: Web oficial del RC Celta (@rccelta)» con una cámara dibujada, y el texto de Telegram termina con «📸 Fotos: Web oficial del RC Celta (@rccelta)».
+- Las 23 fotos están en `assets/caras/` (WebP con fondo transparente, 36 KB de media; los PNG originales pesaban 6,7 MB). Cada archivo se llama como el nombre en `cumpleanos.json` pasado a minúsculas, sin tildes y con guiones: `javi-galan.webp`, `iago-aspas.webp`, `ionut-radu.webp`…
+- **Para añadir la cara de alguien:** deja su recorte (idealmente 356×550, fondo transparente) en `assets/caras/` con ese nombre y listo. Quien no tiene foto sigue saliendo con el diseño de siempre (círculo con la edad), sin crédito.
+- (La lista de quién no tenía foto se ha quedado anticuada: ver v73.)
 
 ## Novedades v71 (Tesouros Celestes, con las fotos de la peña de fondo)
 - La sección de los miércoles se llama ahora **TESOUROS CELESTES** (cabecera, pie de Telegram y avisos). Se ha quitado el número de edición.

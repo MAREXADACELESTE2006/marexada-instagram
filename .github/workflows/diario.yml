@@ -68,5 +68,17 @@ jobs:
         run: |
           git config user.name "marexada-bot"
           git config user.email "marexada-bot@users.noreply.github.com"
+          mkdir -p estado
           git add estado/
-          git diff --cached --quiet || (git commit -m "Estado del $(date -u +%F)" && git push)
+          if ! git diff --cached --quiet; then
+            git commit -m "Estado del $(date -u +%F)"
+            # v74: si mientras tanto alguien subió algo a main (p. ej. una versión nueva por la web), el push se rechazaba y el estado
+            # se perdía sin avisar: la siguiente ejecución repetía las historias. Ahora se reintenta encima de lo nuevo.
+            for i in 1 2 3 4; do
+              git pull --rebase --autostash -X theirs origin "${GITHUB_REF_NAME}" && git push && exit 0
+              git rebase --abort 2>/dev/null || true
+              sleep $((i * 5))
+            done
+            echo "::error::No se pudo guardar estado/ en el repositorio; la próxima ejecución puede repetir historias"
+            exit 1
+          fi

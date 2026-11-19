@@ -141,5 +141,31 @@
   "intentos": 0,
   "id": null,
   "creada": "2026-11-19T00:03:40.586451+01:00"
+ },
+ {
+  "clave": "partemedico-celta-8a219a8c0c-1",
+  "nombre": "partemedico-celta-8a219a8c0c-1-1795101154.jpg",
+  "sha": "ffbc1304a61b515a86fe37e4ad0bf635ca263aff",
+  "url": "https://raw.githubusercontent.com/MAREXADACELESTE2006/marexada-instagram/imagenes/historias/partemedico-celta-8a219a8c0c-1-1795101154.jpg",
+  "texto": "Parte médico do Celta: 5 xogadores en baixa. Álvaro Núñez, Jones El-Abdellaoui, Borja Iglesias, Carl Starfelt, Miguel Román. Moito ánimo e pronta recuperación! 💙 #RCCelta #Celta #MarexadaCeleste",
+  "desde": "2026-11-19T16:12:34.558011+01:00",
+  "hasta": "2026-11-19T23:59:00+01:00",
+  "estado": "simulada",
+  "intentos": 0,
+  "id": null,
+  "creada": "2026-11-19T16:12:36.509334+01:00"
+ },
+ {
+  "clave": "partemedico-fortuna-487c01b215-1",
+  "nombre": "partemedico-fortuna-487c01b215-1-1795101156.jpg",
+  "sha": "d75fee664d36f1f0987b5ca348c4c58ec73aa0d2",
+  "url": "https://raw.githubusercontent.com/MAREXADACELESTE2006/marexada-instagram/imagenes/historias/partemedico-fortuna-487c01b215-1-1795101156.jpg",
+  "texto": "Parte médico do Celta Fortuna: 2 xogadores en baixa. Bernard Somuah, Pablo Gavián. Moito ánimo e pronta recuperación! 💙 #RCCelta #Celta #MarexadaCeleste",
+  "desde": "2026-11-19T16:12:36.509716+01:00",
+  "hasta": "2026-11-19T23:59:00+01:00",
+  "estado": "simulada",
+  "intentos": 0,
+  "id": null,
+  "creada": "2026-11-19T16:12:38.406356+01:00"
  }
 ]

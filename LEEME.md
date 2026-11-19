@@ -1,7 +1,33 @@
-# Marexada Celeste · Instagram automático · v67
+# Marexada Celeste · Instagram automático · v71
 
 Diseños de partido + lector de la web del club (rccelta.es).
 Todavía NO descubre noticias nuevas solo ni publica en Instagram: eso es lo siguiente.
+
+## Novedades v71 (Tesouros Celestes, con las fotos de la peña de fondo)
+- La sección de los miércoles se llama ahora **TESOUROS CELESTES** (cabecera, pie de Telegram y avisos). Se ha quitado el número de edición.
+- **Fotos de fondo de la peña** (carpeta `assets/fondos_tesouros/`): el recorte de periódico «El Celta, un grande en Europa» sale en las 35 efemérides europeas (las de la categoría Europa / Gran noite europea y las que hablan de Champions, UEFA, Recopa, EuroCelta…), y la foto histórica de la bandera en todas las demás. Si dejas más fotos en esa carpeta, el programa las va rotando: las que empiezan por `europa_` son para las noites europeas y las demás para el resto. La foto apaisada se usa a todo el ancho y nítida (es pequeña, 640×360) sobre una versión desenfocada de sí misma; la vertical ocupa toda la historia.
+- **«HAI 27 ANOS»**: ya no es un recuadro; ahora es un sello tipográfico con el número enorme entre «HAI» y «ANOS» y filetes con rombos a los lados.
+- **Invitación a deslizar**: pastilla oscura con el texto en blanco y más grande, y tres flechas que se van apagando.
+- El fondo se oscurece por zonas: la foto se ve en el centro y queda oscura donde hay texto, para que siempre se lea.
+
+## Novedades v70 (imagen de las efemérides más seria y editorial)
+- Nuevo diseño del Almanaque, pensado como publicación de referencia y no como cartel: cabecera «ALMANAQUE CELESTE · Nº 001» (el número es el de la edición: del 1 al 209), marco fino con esquinas, fondo de foto antigua más oscuro y sobrio, y luz suave tras el protagonista.
+- **Portada:** placa de fecha (día enorme | mes y año), los dos escudos con doble aro y el nombre de cada club, placa «HAI 20 ANOS» y titular en serif. Si el partido no tiene rival claro (fundación, ascenso…), sale el escudo del Celta solo.
+- **Historia 2:** marcador gigante con los escudos, los datos en un panel con rótulo «A HISTORIA EN DATOS» y los protagonistas en cursiva.
+- **Historia 3:** «E TI?», el peche en cursiva, la pregunta en una placa y «CÓNTANOLO POR MENSAXE». Barras de avance 1-2-3 en las historias 2 y 3.
+- Nuevas tipografías libres incluidas en `assets/fuentes`: Big Shoulders (números y rótulos, estilo marcador de estadio) y Lora (textos, serif editorial), además de Poppins.
+- Corregido el resplandor tras los escudos, que dejaba cortes rectos.
+
+## Novedades v69 (el horario de GitHub deja de coincidir con cron-job)
+- cron-job.org lanza el modo rápido cada 5 minutos (:00, :05, :10…). El horario propio de `diario.yml` pasa a **cada 10 minutos en los minutos :02, :12, :22…** de 15:00 a 00:52 (invierno), como copia de seguridad: nunca coincide con cron-job. Si una ejecución de cron-job falla, la de GitHub lo recoge en pocos minutos.
+- Las ejecuciones se hacen de una en una (`concurrency`), y las webs delicadas siguen con su freno (rccelta.es 1 vez por hora; besoccer y futbolme cada 10 min).
+
+## Novedades v68 (Almanaque en gallego, imagen nueva y modo rápido cada 5 minutos)
+- **Textos en gallego.** `assets/almanaque.json` sale ahora del Excel «Almanaque_Celta_48_meses_GL.xlsx» (209 miércoles, del 18/11/2026 al 13/11/2030). `convertir_almanaque.py` entiende el Excel en español y en gallego.
+- **Imagen nueva de las 3 historias del miércoles.** Portada: el año enorme de fondo, rayos de luz celestes, escudos con brillo, cinta inclinada «HAI 20 ANOS», fecha completa en gallego y titular en mayúsculas con «DESLIZA PARA VER A HISTORIA». Historia 2: marcador gigante con escudos y los datos en tarjeta, con los protagonistas. Historia 3: «E TI?», el cierre y la pregunta en un recuadro grande con «CÓNTANOLO POR MENSAXE». Si el titular empezaba por «Hai 13 anos: …» se quita ese comienzo en la portada (ya lo dice la cinta).
+- **Modo rápido cada 5 minutos** (lo lanza cron-job.org cada 5 minutos; ver v69 para el horario de GitHub). Para no parecer un robot hay un **freno por web** en el modo rápido: rccelta.es como mucho **1 vez por hora**; besoccer.com y futbolme.com cada 10 minutos. Los goles, el inicio y el descanso salen de ESPN/TheSportsDB (datos abiertos) y se miran cada 5 minutos. Las 3 ejecuciones completas del día consultan siempre. Se puede cambiar con las variables `MIN_RCCELTA`, `MIN_BESOCCER` y `MIN_FUTBOLME` (minutos). La hora de la última consulta se guarda en `estado/consultas_web.json`.
+- Si usas cron-job.org para lanzar el flujo, no hace falta duplicar: o el horario de `diario.yml` o cron-job, pero no los dos a la vez.
+- Ojo con los minutos de GitHub Actions: cada 5 minutos son unas 120 ejecuciones al día. En un repositorio público no hay límite; en uno privado la cuota gratuita (2000 min/mes) se gasta en pocos días.
 
 ## Novedades v67 (Almanaque Celta + escudos de Europa)
 - **Miércoles = Almanaque Celta.** Cada miércoles (a partir de las 19:00) salen **3 historias** con los textos del Excel «Almanaque Celta 48 meses»: 1) gancho, 2) datos (con marcador y escudos si es un partido) y 3) cierre con la pregunta para la afición. Cubre del 18/11/2026 al 13/11/2030 (209 miércoles). Hoy, 18/11/2026: «20 años de una victoria celeste en Riazor» (Deportivo 0-1 Celta).

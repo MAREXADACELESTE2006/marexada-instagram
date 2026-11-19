@@ -1,4 +1,4 @@
-"""Almanaque Celta · historias de los miércoles (v67).
+"""Almanaque Celta · historias de los miércoles (v68).
 
 Lee assets/almanaque.json (hecho con convertir_almanaque.py a partir del Excel) y, si hoy es el miércoles de una publicación,
 prepara sus 3 historias: 1 gancho, 2 datos, 3 cierre. Los textos son los del Excel, tal cual.
@@ -17,6 +17,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 RUTA = os.path.join(BASE, "assets", "almanaque.json")
 MESES = ["XAN", "FEB", "MAR", "ABR", "MAI", "XUÑ", "XUL", "AGO", "SET", "OUT", "NOV", "DEC"]
 SERIE = "ESTA SEMANA NA HISTORIA CELESTE"
+MESES_LARGOS = ["XANEIRO", "FEBREIRO", "MARZO", "ABRIL", "MAIO", "XUÑO", "XULLO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DECEMBRO"]
 
 # Nombres que el buscador automático confundiría o no encontraría (clave: nombre normalizado).
 ALIAS = {
@@ -27,6 +28,7 @@ ALIAS = {
 }
 
 _CON_MARCADOR = re.compile(r"^(?P<a>[^0-9;:(]+?)\s+(?P<ga>\d+)\s*[-–]\s*(?P<gb>\d+)\s+(?P<b>[^;:(.,]+?)\s*(?:[;:(.,]|$)")
+_EUROPA = re.compile(r"champions|uefa|europa league|liga europa|recopa|euro ?celta|europe[ao]|europa\b", re.I)
 _SIN_MARCADOR = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}:\s*(?P<a>[^-–.;]+?)\s+[-–]\s+(?P<b>[^.;(]+)")
 
 
@@ -75,6 +77,17 @@ def fecha_texto(iso):
     return f"{int(d)} {MESES[int(m) - 1]} {y}"
 
 
+def titular_cartel(titular):
+    """En la portada la cinta ya dice «HAI 13 ANOS»: se quita del titular ese comienzo repetido («Hai 13 anos: …»)."""
+    t = re.sub(r"^\s*hai\s+\d+\s+anos?\s*[:,.\-–—]\s*", "", titular or "", flags=re.I).strip()
+    return (t[:1].upper() + t[1:]) if len(t) >= 12 else (titular or "")
+
+
+def fecha_larga(iso):
+    y, m, d = iso.split("-")
+    return f"{int(d)} DE {MESES_LARGOS[int(m) - 1]} DE {y}"
+
+
 def historias(e):
     """Lista de 3 dicts (uno por historia) listos para generar_historia.almanaque()."""
     a, b, ga, gb = equipos(e.get("dato"))
@@ -83,10 +96,12 @@ def historias(e):
     if a and b and (_celta(a) or _celta(b)):
         local, visitante = a, b
     anos = int(e["fecha"][:4]) - int(e["fecha_historica"][:4])
-    base = {"tipo": "almanaque", "serie": SERIE, "anos": anos, "fecha_texto": fecha_texto(e["fecha_historica"]), "titular": e["titular"],
+    num = next((i for i, x in enumerate(cargar(), 1) if x["fecha"] == e["fecha"]), 1)
+    mes = int(e["fecha_historica"][5:7])
+    base = {"tipo": "almanaque", "num": num, "dia": int(e["fecha_historica"][8:10]), "mes_largo": MESES_LARGOS[mes - 1], "anio": e["fecha_historica"][:4], "serie": SERIE, "anos": anos, "fecha_texto": fecha_texto(e["fecha_historica"]), "fecha_larga": fecha_larga(e["fecha_historica"]), "titular": e["titular"],
             "local": slug(local) if local else "celta-vigo", "visitante": slug(visitante) if visitante else None,
             "local_nombre": local, "visitante_nombre": visitante, "goles_local": ga, "goles_visitante": gb,
-            "es_partido": bool(local), "_fecha": e["fecha"], "_hashtags": e.get("hashtags", ""), "total": 3}
+            "es_partido": bool(local), "categoria": e.get("categoria", ""), "europea": bool(_EUROPA.search(" ".join([e["titular"], e["s1"], e["s2"], e["s3"], e.get("dato", "")])) or "europ" in e.get("categoria", "").lower()), "_fecha": e["fecha"], "_hashtags": e.get("hashtags", ""), "total": 3}
     if not local:                                                  # sin rival claro: solo el escudo del Celta
         base.update({"local": "celta-vigo", "visitante": None})
     textos = [limpiar(e["s1"]), limpiar(e["s2"]), limpiar(e["s3"])]
@@ -96,6 +111,7 @@ def historias(e):
         if len(resto) >= 20:
             textos[2] = resto
     base["titular"] = limpiar(base["titular"])
+    base["titular_cartel"] = titular_cartel(base["titular"])
     out = []
     for i, t in enumerate(textos, 1):
         d = dict(base, pantalla=i, texto=t)

@@ -1,4 +1,5 @@
 Escudos: FootyLogos.com (https://www.footylogos.com/). Los escudos y marcas pertenecen a sus
 respectivos clubes, competiciones y federaciones.
-Tipografía: Poppins (SIL Open Font License).
+Tipografías: Poppins, Big Shoulders y Lora (SIL Open Font License; las licencias están en assets/fuentes).
 Fotos de fondo: aportadas por la peña Marexada Celeste.
+Tesouros Celestes: foto histórica y recorte de periódico aportados por la peña Marexada Celeste.

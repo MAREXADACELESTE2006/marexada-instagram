@@ -1433,8 +1433,33 @@ def acabado(img):
 
 
 
-# ---------------------------------------------------------------- almanaque celta (v67): 3 historias por miércoles (gancho, datos, cierre)
-def _parrafo(d, texto, ancho, alto_max, tam_max, tam_min, fuente=None):
+# ---------------------------------------------------------------- Tesouros Celestes (v71): 3 historias por miércoles (portada, datos, peche)
+CEL = (150, 208, 255)
+PLATA = (196, 214, 232)
+OSCURO = (5, 22, 52)
+
+
+def _ft(nombre, tam):
+    return ImageFont.truetype(os.path.join(ASSETS, "fuentes", nombre), int(tam))
+
+
+def f_disp(t):
+    return _ft("BigShoulders-Bold.ttf", t)          # números y titulares: condensada de marcador de estadio
+
+
+def f_serif(t):
+    return _ft("Lora-Regular.ttf", t)               # textos largos: serif editorial
+
+
+def f_serif_b(t):
+    return _ft("Lora-Bold.ttf", t)
+
+
+def f_serif_i(t):
+    return _ft("Lora-Italic.ttf", t)
+
+
+def _parrafo(d, texto, ancho, alto_max, tam_max, tam_min, fuente=None, interlineado=1.36):
     """Parte `texto` en líneas con la letra más grande que quepa en `alto_max`; si aun así sobra, corta con «…». -> (líneas, fuente, paso)."""
     fuente = fuente or font_m
     for tam in range(int(tam_max), int(tam_min) - 1, -2):
@@ -1449,7 +1474,7 @@ def _parrafo(d, texto, ancho, alto_max, tam_max, tam_min, fuente=None):
                 actual = p
         if actual:
             lineas.append(actual)
-        paso = int(tam * 1.36)
+        paso = int(tam * interlineado)
         if len(lineas) * paso <= alto_max:
             return lineas, f, paso
     lineas = lineas[:max(1, int(alto_max // paso))]
@@ -1457,118 +1482,355 @@ def _parrafo(d, texto, ancho, alto_max, tam_max, tam_min, fuente=None):
     return lineas, f, paso
 
 
-def _puntos(img, d, actual, total, y=1412):
-    CEL = (150, 208, 255)
-    x0 = W // 2 - (total - 1) * 26
+def _componer(img, cap):
+    img.paste(cap, (0, 0), cap)
+
+
+def _brillo(img, cx, cy, radio, alfa=170, color=CEL):
+    """Resplandor suave y circular (se desvanece del todo antes de llegar al borde: sin cortes rectos)."""
+    lado = 2 * radio
+    m = Image.new("L", (lado, lado), 0)
+    ImageDraw.Draw(m).ellipse([radio * 0.5, radio * 0.5, radio * 1.5, radio * 1.5], fill=alfa)
+    m = m.filter(ImageFilter.GaussianBlur(radio * 0.2))
+    cap = Image.new("RGBA", (W, H), color + (0,))
+    masc = Image.new("L", (W, H), 0)
+    masc.paste(m, (cx - radio, cy - radio))
+    cap.putalpha(masc)
+    _componer(img, cap)
+
+
+def _esp(d, cx, y, txt, f, fill, esp=6, sombra=False):
+    """Texto con espaciado entre letras, centrado en cx. Devuelve el ancho."""
+    ancho = sum(d.textlength(c, font=f) for c in txt) + esp * (len(txt) - 1)
+    x = cx - ancho / 2
+    for c in txt:
+        if sombra:
+            d.text((x + 2, y + 3), c, font=f, fill=(2, 8, 22))
+        d.text((x, y), c, font=f, fill=fill)
+        x += d.textlength(c, font=f) + esp
+    return ancho
+
+
+def _regla(d, x0, x1, y, color=CEL, grosor=2):
+    d.line([(x0, y), (x1, y)], fill=color, width=grosor)
+
+
+def _foto_tesouros(datos):
+    """Foto de fondo de la edición: las noites europeas usan los recortes `europa_*`; el resto, las demás fotos de assets/fondos_tesouros
+    (si hay varias, van rotando según el número de edición). Para añadir fotos basta con dejarlas en esa carpeta."""
+    carpeta = os.path.join(ASSETS, "fondos_tesouros")
+    if not os.path.isdir(carpeta):
+        return None
+    fotos = sorted(f for f in os.listdir(carpeta) if f.lower().endswith((".jpg", ".jpeg", ".png", ".webp")))
+    europea = bool(datos.get("europea")) or "europ" in (datos.get("categoria") or "").lower()
+    cand = [f for f in fotos if f.startswith("europa_") == europea] or fotos
+    return os.path.join(carpeta, cand[int(datos.get("num") or 0) % len(cand)]) if cand else None
+
+
+def _fondo_foto(datos, yband):
+    """Fondo con la foto de la peña teñida de azul noche: si es apaisada va a todo el ancho (nítida, con los bordes difuminados) sobre una
+    versión borrosa de sí misma; si es vertical (recorte de periódico) ocupa toda la historia."""
+    import random
+    from PIL import ImageOps
+    ruta = _foto_tesouros(datos)
+    if not ruta:
+        return fondo_historico()
+    foto = Image.open(ruta).convert("L")
+    w, h = foto.size
+    if w > h:
+        base = ImageOps.fit(foto, (W, H), Image.LANCZOS).filter(ImageFilter.GaussianBlur(22))
+        bh = round(W * h / w)
+        banda = foto.resize((W, bh), Image.LANCZOS).filter(ImageFilter.UnsharpMask(radius=2.2, percent=130, threshold=2))
+        masc = Image.new("L", (W, bh), 255)
+        md = ImageDraw.Draw(masc)
+        borde = int(bh * 0.24)
+        for i in range(borde):
+            v = int(255 * (i / borde) ** 1.4)
+            md.line([(0, i), (W, i)], fill=v)
+            md.line([(0, bh - 1 - i), (W, bh - 1 - i)], fill=v)
+        base.paste(banda, (0, int(yband - bh / 2)), masc)
+    else:
+        base = ImageOps.fit(foto, (W, H), Image.LANCZOS)
+    gris = ImageOps.autocontrast(base, cutoff=1).point(lambda v: int(255 * (v / 255) ** 1.25))
+    img = ImageOps.colorize(gris, black=(3, 10, 26), white=(168, 212, 246)).convert("RGB")
+    img = Image.blend(img, Image.new("RGB", (W, H), (6, 22, 50)), 0.16)
+    vig = Image.new("L", (W, H), 0)
+    vd = ImageDraw.Draw(vig)
+    for i in range(60):
+        vd.rectangle([i * 9, i * 16, W - i * 9, H - i * 16], outline=int(150 * (1 - i / 60) ** 2), width=18)
+    img.paste(Image.new("RGB", (W, H), (2, 8, 20)), (0, 0), vig.filter(ImageFilter.GaussianBlur(40)))
+    rnd = random.Random(7)
+    grano = Image.new("L", (W // 2, H // 2))
+    grano.putdata([rnd.randint(110, 146) for _ in range(W // 2 * H // 2)])
+    grano = grano.resize((W, H), Image.NEAREST)
+    return Image.blend(img, Image.merge("RGB", (grano, grano, grano)), 0.07)
+
+
+ANCLAS = {   # (y, oscuridad 0-255): claro donde se ve la foto, oscuro donde hay texto
+    1: [(0, 215), (300, 190), (400, 55), (930, 60), (1020, 175), (1200, 205), (1466, 215), (1920, 230)],
+    2: [(0, 215), (170, 195), (235, 55), (780, 70), (850, 185), (1100, 205), (1920, 230)],
+    3: [(0, 215), (160, 195), (230, 60), (760, 70), (860, 185), (1100, 205), (1920, 230)],
+}
+
+
+def _fondo_almanaque(datos, yband=640, foco=(540, 760), radio=620, alfa=95):
+    """Fondo de foto antigua, sobrio: la foto se ve en el centro y se oscurece arriba y abajo para que el texto se lea; marco fino con esquinas."""
+    img = _fondo_foto(datos, yband)
+    cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    dd = ImageDraw.Draw(cap)
+    anclas = ANCLAS.get(datos.get("pantalla", 1), ANCLAS[1])
+    for y in range(H):
+        for (y0, a0), (y1, a1) in zip(anclas, anclas[1:]):
+            if y0 <= y <= y1:
+                a = a0 + (a1 - a0) * (y - y0) / (y1 - y0)
+                break
+        dd.line([(0, y), (W, y)], fill=(3, 10, 28, int(a)))
+    _componer(img, cap)
+    if foco:
+        _brillo(img, foco[0], foco[1], radio, max(40, alfa - 40))
+    d = ImageDraw.Draw(img)
+    d.rectangle([40, 40, W - 40, H - 40], outline=CEL, width=2)
+    L = 54                                                                # esquinas dobles
+    for sx, sy in ((40, 40), (W - 40, 40), (40, H - 40), (W - 40, H - 40)):
+        dx = 1 if sx < W / 2 else -1
+        dy = 1 if sy < H / 2 else -1
+        d.line([(sx + dx * 14, sy + dy * 14), (sx + dx * (14 + L), sy + dy * 14)], fill=CEL, width=4)
+        d.line([(sx + dx * 14, sy + dy * 14), (sx + dx * 14, sy + dy * (14 + L))], fill=CEL, width=4)
+    return img
+
+
+def _cabecera(img, grande=True):
+    """Cabecera de publicación: «TESOUROS CELESTES» entre filetes."""
+    d = ImageDraw.Draw(img)
+    if grande:
+        y = 124
+        ancho = _esp(d, W // 2, y, "TESOUROS CELESTES", f_disp(100), WHITE, 10, sombra=True)
+        yl = y + 60
+        _regla(d, 96, W // 2 - ancho / 2 - 34, yl, CEL, 3); _regla(d, W // 2 + ancho / 2 + 34, W - 96, yl, CEL, 3)
+        _esp(d, W // 2, y + 122, "ESTA SEMANA NA HISTORIA CELESTE", font_m(26), PLATA, 6)
+        _regla(d, 96, W - 96, y + 174, (CEL[0] // 2, CEL[1] // 2, CEL[2] // 2), 2)
+    else:
+        y = 112
+        ancho = _esp(d, W // 2, y, "TESOUROS CELESTES", f_disp(58), WHITE, 9, sombra=True)
+        yl = y + 35
+        _regla(d, 96, W // 2 - ancho / 2 - 30, yl, CEL, 2); _regla(d, W // 2 + ancho / 2 + 30, W - 96, yl, CEL, 2)
+
+
+def _sello_anos(img, y, anos):
+    """«HAI 27 ANOS» como sello tipográfico: número enorme entre HAI y ANOS, flanqueado por filetes con rombos."""
+    d = ImageDraw.Draw(img)
+    num = str(anos)
+    palabra = "ANO" if anos == 1 else "ANOS"
+    fn, ft = f_disp(215), f_disp(80)
+    esp = 9
+    ww = lambda t: sum(d.textlength(c, font=ft) for c in t) + esp * (len(t) - 1)
+    w_hai, w_anos, w_n = ww("HAI"), ww(palabra), d.textlength(num, font=fn)
+    gap = 30
+    total = w_hai + gap + w_n + gap + w_anos
+    x0 = (W - total) / 2
+    bn = d.textbbox((0, 0), num, font=fn)
+    h_n = bn[3] - bn[1]
+    cy = y + h_n / 2
+    _brillo(img, W // 2, int(cy), 330, 120)
+    d = ImageDraw.Draw(img)
+    d.text((x0 + w_hai + gap + 3, y - bn[1] + 5), num, font=fn, fill=(2, 8, 22))               # sombra
+    d.text((x0 + w_hai + gap, y - bn[1]), num, font=fn, fill=WHITE)
+    bt = d.textbbox((0, 0), "HAI", font=ft)
+    ys = y + h_n - bt[3]
+    x = x0
+    for c in "HAI":
+        d.text((x, ys), c, font=ft, fill=CEL)
+        x += d.textlength(c, font=ft) + esp
+    x = x0 + w_hai + gap + w_n + gap
+    for c in palabra:
+        d.text((x, ys), c, font=ft, fill=CEL)
+        x += d.textlength(c, font=ft) + esp
+    xi, xd = x0 - 40, x0 + total + 40
+    _regla(d, 96, xi - 22, cy, CEL, 3); _regla(d, xd + 22, W - 96, cy, CEL, 3)
+    _rombo(d, int(xi), int(cy), 9, CEL); _rombo(d, int(xd), int(cy), 9, CEL)
+
+
+def _invitacion(img, y):
+    """Invitación a deslizar: pastilla oscura con el texto bien legible y tres flechas que se van apagando."""
+    d = ImageDraw.Draw(img)
+    txt = "DESLIZA PARA VER A HISTORIA"
+    f = font(32)
+    esp = 3
+    w = sum(d.textlength(c, font=f) for c in txt) + esp * (len(txt) - 1)
+    ancho_fl = 74
+    total = 44 + w + 24 + ancho_fl + 38
+    x0 = W / 2 - total / 2
+    _rgba(img, [x0, y, x0 + total, y + 66], 33, (3, 14, 36, 240), borde=CEL + (255,), grosor=3)
+    d = ImageDraw.Draw(img)
+    x = x0 + 44
+    for c in txt:
+        d.text((x, y + 33 - 26), c, font=f, fill=WHITE)
+        x += d.textlength(c, font=f) + esp
+    xa = x0 + 44 + w + 24
+    for i, alfa in enumerate((1.0, 0.62, 0.32)):
+        col = tuple(int(CEL[k] * alfa + (3, 14, 36)[k] * (1 - alfa)) for k in range(3))
+        xx = xa + i * 22
+        d.line([(xx, y + 20), (xx + 12, y + 33), (xx, y + 46)], fill=col, width=6, joint="curve")
+
+
+def _barras(img, actual, total, y=1432):
+    d = ImageDraw.Draw(img)
+    ancho, hueco = 74, 14
+    x0 = W // 2 - (total * ancho + (total - 1) * hueco) / 2
     for i in range(total):
-        cx = x0 + i * 52
-        if i + 1 == actual:
-            d.ellipse([cx - 13, y - 13, cx + 13, y + 13], fill=CEL)
-        else:
-            d.ellipse([cx - 10, y - 10, cx + 10, y + 10], outline=CEL, width=3)
+        x = x0 + i * (ancho + hueco)
+        d.rounded_rectangle([x, y - 4, x + ancho, y + 4], 4, fill=CEL if i + 1 == actual else (CEL[0] // 3, CEL[1] // 3, CEL[2] // 3))
+
+
+def _escudo_aro(img, cx, cy, slug, sig, r):
+    _brillo(img, cx, cy, int(r * 2.1), 150)
+    escudo_mini(img, cx, cy, slug, sig, r=r)
+    d = ImageDraw.Draw(img)
+    d.ellipse([cx - r - 11, cy - r - 11, cx + r + 11, cy + r + 11], outline=CEL, width=4)
+    d.ellipse([cx - r - 24, cy - r - 24, cx + r + 24, cy + r + 24], outline=(CEL[0] // 2, CEL[1] // 2, CEL[2] // 2), width=2)
+
+
+def _marco_texto(img, y, texto, alto_max, tam_max, tam_min, fuente, x0=84, rotulo=None):
+    """Panel oscuro con filete fino y texto de lectura cómoda (serif). Devuelve la y del final."""
+    d = ImageDraw.Draw(img)
+    y_txt = y + (74 if rotulo else 40)
+    lineas, f, paso = _parrafo(d, texto, W - 2 * x0 - 2 * 52, alto_max - (y_txt - y) - 44, tam_max, tam_min, fuente, 1.38)
+    alto = (y_txt - y) + len(lineas) * paso + 40
+    _rgba(img, [x0, y, W - x0, y + alto], 8, (3, 14, 36, 214), borde=CEL + (150,), grosor=2)
+    dd = ImageDraw.Draw(img)
+    dd.rectangle([x0, y, x0 + 8, y + alto], fill=CEL)                       # barra celeste a la izquierda
+    if rotulo:
+        _esp(dd, W // 2 + 4, y + 26, rotulo, font_m(24), CEL, 6)
+    for i, ln in enumerate(lineas):
+        dd.text((x0 + 52, y_txt + i * paso), ln, font=f, fill=WHITE)
+    return y + alto
 
 
 def almanaque(datos):
     global AZUL
-    CEL = (150, 208, 255)
-    OSCURO = (5, 22, 52)
-    img = fondo_historico(); d = ImageDraw.Draw(img)
-    d.rectangle([34, 34, W - 34, H - 34], outline=CEL, width=3)
-    d.rectangle([48, 48, W - 48, H - 48], outline=(CEL[0] // 2, CEL[1] // 2, CEL[2] // 2), width=2)
     p, total = datos.get("pantalla", 1), datos.get("total", 3)
-    serie = datos.get("serie", "ESTA SEMANA NA HISTORIA CELESTE")
-    _texto_borde(d, 92, serie, fit(d, serie, 40, W - 170, 24), CEL, grosor=5)
     anos = datos.get("anos") or 0
     hai = f"HAI {anos} {'ANO' if anos == 1 else 'ANOS'}"
-    fecha = datos.get("fecha_texto", "")
     loc, vis = datos.get("local"), datos.get("visitante")
     nl, nv = datos.get("local_nombre") or "Celta", datos.get("visitante_nombre") or ""
-
-    def pastilla(y, txt, tam=44):
-        ft = fit(d, txt, tam, W - 260, 26)
-        tw = d.textlength(txt, font=ft)
-        d.rounded_rectangle([W // 2 - tw / 2 - 52, y, W // 2 + tw / 2 + 52, y + 78], 39, fill=CEL)
-        d.text((W // 2 - tw / 2, y + 39 - ft.size * 0.70), txt, font=ft, fill=OSCURO)
-
-    def tarjeta(y, texto, alto_max, tam_max, tam_min=30):
-        lineas, f, paso = _parrafo(d, texto, W - 2 * (72 + 52), alto_max - 80, tam_max, tam_min)
-        alto = len(lineas) * paso + 80
-        _rgba(img, [72, y, W - 72, y + alto], 30, (5, 20, 48, 222), borde=CEL + (255,), grosor=3)
-        dd = ImageDraw.Draw(img)
-        for i, ln in enumerate(lineas):
-            dd.text((72 + 52, y + 40 + i * paso), ln, font=f, fill=WHITE)
-        return y + alto
-
     if p == 1:
-        _texto_borde(d, 150, hai, fit(d, hai, 150, W - 140, 70), WHITE, grosor=9)
-        pastilla(335, fecha)
+        img = _fondo_almanaque(datos, 640, (540, 760), 640, 100)
+        _cabecera(img, True)
+        d = ImageDraw.Draw(img)
+        # placa de fecha: día enorme | mes y año
+        dia, mes, anio = str(datos.get("dia", "")), datos.get("mes_largo", ""), str(datos.get("anio", ""))
+        fd, fm, fa = f_disp(262), f_disp(84), f_disp(156)
+        wd = d.textlength(dia, font=fd)
+        wm = sum(d.textlength(c, font=fm) for c in mes) + 12 * (len(mes) - 1)
+        wa = d.textlength(anio, font=fa)
+        wr = max(wm, wa)
+        gap = 44
+        x0 = (W - (wd + 2 * gap + 4 + wr)) / 2
+        y0 = 338
+        bb = d.textbbox((0, 0), dia, font=fd)
+        d.text((x0 + 3, y0 - bb[1] + 4), dia, font=fd, fill=(2, 8, 22))
+        d.text((x0, y0 - bb[1]), dia, font=fd, fill=WHITE)
+        alto_dia = bb[3] - bb[1]
+        xr = x0 + wd + 2 * gap + 4
+        d.rectangle([x0 + wd + gap, y0 + 8, x0 + wd + gap + 3, y0 + alto_dia - 8], fill=CEL)
+        ba = d.textbbox((0, 0), anio, font=fa)
+        bm = d.textbbox((0, 0), "A", font=fm)
+        h_blq = (bm[3] - bm[1]) + 28 + (ba[3] - ba[1])
+        yb = y0 + (alto_dia - h_blq) / 2
+        _esp(d, xr + wr / 2, yb - bm[1], mes, fm, CEL, 12, sombra=True)
+        d.text((xr + (wr - wa) / 2 + 2, yb + (bm[3] - bm[1]) + 28 - ba[1] + 3), anio, font=fa, fill=(2, 8, 22))
+        d.text((xr + (wr - wa) / 2, yb + (bm[3] - bm[1]) + 28 - ba[1]), anio, font=fa, fill=WHITE)
+        # protagonistas del cartel
+        cy = 742
         if vis:
-            escudo_mini(img, 300, 570, loc, siglas(nl), r=112)
-            escudo_mini(img, 780, 570, vis, siglas(nv), r=112)
+            _escudo_aro(img, 280, cy, loc, siglas(nl), 112)
+            _escudo_aro(img, 800, cy, vis, siglas(nv), 112)
             d = ImageDraw.Draw(img)
-            _texto_borde(d, 530, "VS", font(70), CEL, grosor=5, x=540)
+            fv = f_disp(92)
+            d.text((540 - d.textlength("VS", font=fv) / 2 + 2, cy - 58 + 3), "VS", font=fv, fill=(2, 8, 22))
+            d.text((540 - d.textlength("VS", font=fv) / 2, cy - 58), "VS", font=fv, fill=CEL)
+            for x, n in ((280, nl), (800, nv)):
+                fn = fit(d, n.upper(), 30, 330, 18)
+                _esp(d, x, cy + 112 + 50, n.upper(), fn, WHITE, 4, sombra=True)
         else:
-            escudo_mini(img, 540, 570, loc or "celta-vigo", "RC", r=135)
+            _escudo_aro(img, 540, cy - 8, loc or "celta-vigo", "RC", 122)
             d = ImageDraw.Draw(img)
-        tit, ft, paso = _parrafo(d, datos["titular"], W - 190, 250, 66, 40, font)
-        y = 735
+            _esp(d, 540, cy - 8 + 122 + 50, "REAL CLUB CELTA", font_m(30), WHITE, 6, sombra=True)
+        # «HAI N ANOS»: sello tipográfico
+        _sello_anos(img, 968, anos)
+        d = ImageDraw.Draw(img)
+        # titular editorial
+        d.line([(W // 2 - 70, 1176), (W // 2 + 70, 1176)], fill=CEL, width=3)
+        tit, ft, paso = _parrafo(d, datos.get("titular_cartel") or datos["titular"], W - 190, 178, 56, 32, f_serif_b, 1.2)
+        y = 1198
         for ln in tit:
-            _texto_borde(d, y, ln, ft, WHITE, grosor=6)
+            center(d, y, ln, ft, WHITE)
             y += paso
-        tarjeta(max(y + 22, 960), datos["texto"], 1385 - max(y + 22, 960), 52)
+        _invitacion(img, 1388)
     elif p == 2:
-        pastilla(170, f"{fecha}  ·  {hai}", 36)
-        y_tarjeta = 700
+        img = _fondo_almanaque(datos, 500, (540, 480), 520, 90)
+        _cabecera(img, False)
+        d = ImageDraw.Draw(img)
+        _esp(d, 540, 178, f"{datos.get('fecha_texto', '')}   ·   {hai}", font_m(28), PLATA, 5)
         if vis and datos.get("goles_local") is not None:
-            cy = 440
-            escudo_mini(img, 230, cy, loc, siglas(nl), r=105)
-            escudo_mini(img, 850, cy, vis, siglas(nv), r=105)
+            cy = 495
+            _escudo_aro(img, 170, cy, loc, siglas(nl), 100)
+            _escudo_aro(img, 910, cy, vis, siglas(nv), 100)
             d = ImageDraw.Draw(img)
             a, b = str(datos["goles_local"]), str(datos["goles_visitante"])
-            fs = font(190)
-            hueco, barra = 36, 46
-            total_w = d.textlength(a, font=fs) + d.textlength(b, font=fs) + 2 * hueco + barra
-            x0 = W / 2 - total_w / 2
-            bn = d.textbbox((0, 0), "8", font=fs)
-            ty = cy - (bn[1] + bn[3]) / 2
-            wa = d.textlength(a, font=fs)
-            _texto_borde(d, ty, a, fs, WHITE, grosor=8, x=x0 + wa / 2)
-            d.rounded_rectangle([x0 + wa + hueco, cy - 8, x0 + wa + hueco + barra, cy + 8], 8, fill=CEL)
-            _texto_borde(d, ty, b, fs, WHITE, grosor=8, x=x0 + wa + 2 * hueco + barra + d.textlength(b, font=fs) / 2)
-            for x, n in ((230, nl), (850, nv)):
-                fn = fit(d, n.upper(), 34, 260, 20)
-                center(d, cy + 125, n.upper(), fn, fill=CEL, x=x)
-            y_tarjeta = 650
+            fs = f_disp(430)
+            wa_, wb_ = d.textlength(a, font=fs), d.textlength(b, font=fs)
+            barra, hueco = 54, 34
+            x0 = W / 2 - (wa_ + wb_ + 2 * hueco + barra) / 2
+            bb = d.textbbox((0, 0), "8", font=fs)
+            ty = cy - (bb[1] + bb[3]) / 2
+            d.text((x0, ty), a, font=fs, fill=WHITE)
+            d.rectangle([x0 + wa_ + hueco, cy - 6, x0 + wa_ + hueco + barra, cy + 6], fill=CEL)
+            d.text((x0 + wa_ + 2 * hueco + barra, ty), b, font=fs, fill=WHITE)
+            for x, n in ((170, nl), (910, nv)):
+                fn = fit(d, n.upper(), 26, 250, 16)
+                _esp(d, x, cy + 100 + 44, n.upper(), fn, PLATA, 3)
+            y_card = 745
         else:
-            tit, ft, paso = _parrafo(d, datos["titular"], W - 190, 300, 70, 42, font)
-            y = 320
-            for ln in tit:
-                _texto_borde(d, y, ln, ft, WHITE, grosor=6)
-                y += paso
-            y_tarjeta = y + 40
-        fin = tarjeta(y_tarjeta, datos["texto"], 1230 - y_tarjeta, 50)
+            _escudo_aro(img, 540, 440, loc or "celta-vigo", "RC", 120)
+            y_card = 650
+        fin = _marco_texto(img, y_card, datos["texto"], 1230 - y_card, 58, 32, f_serif, rotulo="A HISTORIA EN DATOS")
         prot = (datos.get("protagonistas") or "").strip()
-        if prot:
-            y = max(fin + 30, 1195)
-            _texto_borde(d, y, "PROTAGONISTAS", font(28), CEL, grosor=3)
-            lineas, f, paso = _parrafo(d, prot, W - 200, 1385 - (y + 46), 36, 24, font_m)
-            for i, ln in enumerate(lineas):
-                center(d, y + 46 + i * paso, ln, f, fill=WHITE)
-    else:
-        escudo_mini(img, 540, 330, "celta-vigo", "RC", r=130)
         d = ImageDraw.Draw(img)
-        fin = tarjeta(540, datos["texto"], 600, 58)
-        preg = (datos.get("pregunta") or "").strip()
-        if preg:
-            y0 = max(fin + 50, 1100)
-            lineas, f, paso = _parrafo(d, preg, W - 2 * (110 + 40), 1385 - y0 - 60, 48, 30, font)
-            alto = len(lineas) * paso + 60
-            d.rounded_rectangle([110, y0, W - 110, y0 + alto], 40, fill=CEL)
+        if prot:
+            y = fin + 48
+            _esp(d, 540, y, "PROTAGONISTAS", font_m(24), CEL, 6)
+            lineas, f, paso = _parrafo(d, prot, W - 200, 1405 - (y + 42), 36, 24, f_serif_i, 1.3)
             for i, ln in enumerate(lineas):
-                center(d, y0 + 30 + i * paso, ln, f, fill=OSCURO)
-    _puntos(img, d, p, total)
+                center(d, y + 42 + i * paso, ln, f, fill=PLATA)
+        _barras(img, 2, total)
+    else:
+        img = _fondo_almanaque(datos, 520, (540, 430), 520, 90)
+        _cabecera(img, False)
+        d = ImageDraw.Draw(img)
+        fe = f_disp(430)
+        bb = d.textbbox((0, 0), "E TI?", font=fe)
+        d.text(((W - d.textlength("E TI?", font=fe)) / 2, 200 - bb[1]), "E TI?", font=fe, fill=WHITE)
+        yq = 200 + (bb[3] - bb[1]) + 38
+        _escudo_aro(img, 540, yq + 100, "celta-vigo", "RC", 92)
+        fin = _marco_texto(img, yq + 250, datos["texto"], 1085 - (yq + 250) + 70, 58, 32, f_serif_i)
+        preg = (datos.get("pregunta") or "").strip()
+        d = ImageDraw.Draw(img)
+        if preg:
+            y0 = max(fin + 36, 1090)
+            lineas, f, paso = _parrafo(d, preg, W - 2 * (116 + 40), 1380 - y0 - 60, 50, 30, f_serif_b, 1.24)
+            alto = len(lineas) * paso + 58
+            _rgba(img, [110, y0, W - 110, y0 + alto], 4, CEL + (255,), borde=(236, 247, 255, 255), grosor=3)
+            d = ImageDraw.Draw(img)
+            d.rectangle([98, y0 - 12, W - 98, y0 + alto + 12], outline=(236, 247, 255), width=2)
+            for i, ln in enumerate(lineas):
+                center(d, y0 + 27 + i * paso, ln, f, fill=OSCURO)
+            yc = y0 + alto + 42
+            if yc < 1400:
+                _esp(d, 540, yc, "CÓNTANOLO POR MENSAXE", font_m(24), CEL, 5)
+        _barras(img, 3, total)
     AZUL = (146, 202, 246)
-    pie(img, d)
+    pie(img, ImageDraw.Draw(img))
     return img
 
 

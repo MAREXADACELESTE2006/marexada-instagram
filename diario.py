@@ -30,6 +30,13 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 MADRID = ZoneInfo("Europe/Madrid")
 ESTADO = os.path.join(BASE, "estado", "publicado.json")
+CONSULTAS_WEB = os.path.join(BASE, "estado", "consultas_web.json")
+# v68: freno por web. En modo RÁPIDO (que puede lanzarse cada 5 min) cada web «delicada» solo se consulta si pasaron N minutos desde la última vez.
+# Las ejecuciones COMPLETAS (3 al día) consultan siempre. ESPN / TheSportsDB (APIs abiertas de datos) no llevan freno: son las que dan los goles.
+FUENTE_HOST = {"noticias.py": "rccelta.es", "partemedico.py": "rccelta.es", "entradas.py": "rccelta.es", "besoccer.py": "besoccer.com", "futbolme.py": "futbolme.com"}
+MIN_RAPIDO = {"rccelta.es": float(os.environ.get("MIN_RCCELTA", "60")),         # el club: como mucho 1 vez por hora
+              "besoccer.com": float(os.environ.get("MIN_BESOCCER", "10")),      # webs que se leen como página (HTML): sin prisas
+              "futbolme.com": float(os.environ.get("MIN_FUTBOLME", "10"))}
 AGENDA = os.path.join(BASE, "estado", "agenda.json")           # fechas de los partidos cercanos (la usa el modo rápido para saber si hay algo que vigilar)
 RAPIDAS = {"calendario.py", "noticias.py", "resultados.py", "futbolme.py", "besoccer.py", "directo.py"}     # fuentes del modo rápido: convocatorias y resultados
 CLAVES_RAPIDAS = ("convocatoria-", "cronica-", "resultado-", "inicio-", "descanso-", "gol-")
@@ -38,7 +45,7 @@ HASHTAGS = "#RCCelta #Celta #MarexadaCeleste"
 RECORDATORIOS = {
     0: ["Noticia do día (mañá, de rccelta.es)"],
     1: ["Noticia do día (mañá, de rccelta.es)", "Celta Fortuna / cantera (tarde, de rccelta.es)"],
-    2: ["Noticia do día (mañá, de rccelta.es)"],                  # a historia celeste das 19:00 sae soa (Almanaque Celta, v67)
+    2: ["Noticia do día (mañá, de rccelta.es)"],                  # Tesouros Celestes (as 3 historias do mércores, 19:00) saen soas
     3: ["Noticia do día (mañá, de rccelta.es)"],
     4: ["Convocatoria (tarde, cando a publique o club)"],
     5: ["Aniversarios ou goleadores (mañá)", "Contido de peña: viaxe, merchandising, socios (tarde)"],
@@ -47,6 +54,17 @@ RECORDATORIOS = {
 
 
 # ---------------------------------------------------------------- utilidades
+def web_toca(rapido, ahora, ultima_iso, minutos):
+    """True si toca consultar esa web. Completo: siempre. Rápido: solo si pasaron `minutos` desde la última consulta."""
+    if not rapido or not ultima_iso:
+        return True
+    try:
+        ultima = datetime.datetime.fromisoformat(ultima_iso)
+    except ValueError:
+        return True
+    return (ahora - ultima) >= datetime.timedelta(minutes=minutos)
+
+
 def cargar(ruta):
     try:
         return json.load(open(ruta, encoding="utf-8"))
@@ -234,7 +252,7 @@ def crear_historia(datos, hoy, d_datos, avisos, offline=False, rapido=False):
         todas = almanaque.cargar()
     except Exception as e:
         todas = []
-        avisos.append(f"Almanaque: no se pudo leer assets/almanaque.json ({e})")
+        avisos.append(f"Tesouros Celestes: no se pudo leer assets/almanaque.json ({e})")
     if hoy.weekday() == 2:
         e = almanaque.entrada(hoy, todas)
         if e:
@@ -316,7 +334,7 @@ def plan(hoy, datos, avisos):
         if not ah:
             break
         add(f"almanaque-{ah['_fecha']}-{i}", f"almanaque_{i}.json", "tarde", f"19:{(i - 1) * 2:02d}",
-            f"ESTA SEMANA NA HISTORIA CELESTE ({i}/3): {ah['titular']} 💙 {HASHTAGS}")
+            f"TESOUROS CELESTES ({i}/3): {ah['titular']} 💙 {HASHTAGS}")
 
     cov = datos.get("historia_portada_hoy.json")                  # v63: miércoles, «Esta semana na historia celeste»: portada y después un partido por historia
     if cov:
@@ -535,7 +553,25 @@ def main():
         ]
     if rapido:
         fuentes = [f for f in fuentes if f[0] in RAPIDAS]
+    ahora_utc = datetime.datetime.now(datetime.timezone.utc)
+    control = {} if (a.offline or a.sin_estado) else (cargar(CONSULTAS_WEB) or {})
+    if rapido and not a.offline:
+        quedan = []
+        for f in fuentes:
+            host = FUENTE_HOST.get(f[0])
+            if host and not web_toca(True, ahora_utc, control.get(host), MIN_RAPIDO[host]):
+                print(f"{f[0]}: {host} consultada hace poco (mínimo {MIN_RAPIDO[host]:g} min en modo rápido); se salta.")
+                continue
+            quedan.append(f)
+        fuentes = quedan
     ok = [correr(s, args, etq, avisos) for s, args, etq in fuentes]
+    if not a.offline and not a.sin_estado:
+        usados = {FUENTE_HOST[f[0]] for f in fuentes if f[0] in FUENTE_HOST}
+        if usados:                                                  # se anota aunque falle (403, 502): así no se insiste antes de tiempo
+            for h in usados:
+                control[h] = ahora_utc.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+            os.makedirs(os.path.dirname(CONSULTAS_WEB), exist_ok=True)
+            json.dump(control, open(CONSULTAS_WEB, "w", encoding="utf-8"))
 
     datos = {f: cargar(os.path.join(d_datos, f)) for f in os.listdir(d_datos) if f.endswith(".json")}
     crear_pronostico(datos, hoy, d_datos)

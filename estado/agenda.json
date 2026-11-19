@@ -1,6 +1,11 @@
 {
- "actualizada": "2026-11-19",
+ "actualizada": "2026-11-20",
  "partidos": [
+  {
+   "equipo": "as_celtas_fem",
+   "fecha": "2026-11-14",
+   "hora": null
+  },
   {
    "equipo": "as_celtas_fem",
    "fecha": "2026-11-22",
@@ -19,7 +24,7 @@
   {
    "equipo": "fortuna",
    "fecha": "2026-11-16",
-   "hora": "20:30"
+   "hora": null
   },
   {
    "equipo": "fortuna",

@@ -180,19 +180,22 @@
    "nombre": "Coke Carrillo",
    "posicion": "Porteiro",
    "equipo": "fortuna",
-   "nacimiento": "2002-01-07"
+   "nacimiento": "2002-01-07",
+   "instagram": "cokecarrillo"
   },
   {
    "nombre": "Caio Barone",
    "posicion": "Porteiro",
    "equipo": "fortuna",
-   "nacimiento": "2006-05-04"
+   "nacimiento": "2006-05-04",
+   "instagram": "caiobarone_"
   },
   {
    "nombre": "Joel López",
    "posicion": "Defensa (Lateral esquerdo)",
    "equipo": "fortuna",
-   "nacimiento": "2002-03-31"
+   "nacimiento": "2002-03-31",
+   "instagram": "joellopez.5"
   },
   {
    "nombre": "Andrés Antañón",
@@ -205,13 +208,15 @@
    "nombre": "Óscar Marcos",
    "posicion": "Centrocampista ofensivo",
    "equipo": "fortuna",
-   "nacimiento": "2006-02-19"
+   "nacimiento": "2006-02-19",
+   "instagram": "oscarmarcoss"
   },
   {
    "nombre": "Stefan Bajcetic",
    "posicion": "Pivote",
    "equipo": "fortuna",
-   "nacimiento": "2004-10-22"
+   "nacimiento": "2004-10-22",
+   "instagram": "stefanbajcetic"
   },
   {
    "nombre": "Fredi Álvarez",

@@ -136,7 +136,7 @@ def guardar_cola(cola):
     json.dump(cola, open(COLA, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
 
-def encolar(clave, ruta_imagen, texto, desde, hasta):
+def encolar(clave, ruta_imagen, texto, desde, hasta, etiquetas=None):
     """Sube la imagen y la apunta en la cola. desde/hasta: datetime con zona horaria. No hace nada si ya estaba en la cola."""
     cola = cargar_cola()
     if any(i["clave"] == clave for i in cola):
@@ -148,7 +148,7 @@ def encolar(clave, ruta_imagen, texto, desde, hasta):
         time.sleep(5)
         url, sha = subir_imagen(ruta_imagen, nombre)
     cola.append({"clave": clave, "nombre": nombre, "sha": sha, "url": url, "texto": texto, "desde": desde.isoformat(), "hasta": hasta.isoformat(),
-                 "estado": "pendiente", "intentos": 0, "id": None, "creada": ahora().isoformat()})
+                 "estado": "pendiente", "intentos": 0, "id": None, "creada": ahora().isoformat(), **({"etiquetas": list(etiquetas)} if etiquetas else {})})
     guardar_cola(cola)
     return True
 
@@ -166,10 +166,22 @@ def avisar(texto):
 
 
 # ---------------------------------------------------------------- Instagram
-def publicar_historia(url):
-    """Crea el contenedor de la historia con la imagen, espera a que Instagram la procese y la publica. Devuelve el id."""
+def publicar_historia(url, etiquetas=None):
+    """Crea el contenedor de la historia con la imagen, espera a que Instagram la procese y la publica. Devuelve el id.
+    v77: etiquetas = lista de cuentas (sin @) a mencionar en la historia (user_tags de la API, activo para historias desde julio de 2025).
+    Si Instagram rechaza alguna (cuenta que no existe, privada...), la historia se publica igual, sin etiquetas."""
     uid = os.environ["IG_USER_ID"]
-    cid = _graph(f"{uid}/media", {"image_url": url, "media_type": "STORIES"}, post=True)["id"]
+    campos = {"image_url": url, "media_type": "STORIES"}
+    cid = None
+    if etiquetas:
+        tags = [{"username": u.lstrip("@"), "x": 0.5, "y": 0.67} for u in etiquetas]        # y 0.67: justo sobre la línea «@cuenta» de la imagen
+        try:
+            cid = _graph(f"{uid}/media", {**campos, "user_tags": json.dumps(tags)}, post=True)["id"]
+        except Exception as e:
+            print(f"aviso: Instagram no aceptó las etiquetas {etiquetas}: {e}; se publica sin etiquetar.", file=sys.stderr)
+            avisar(f"⚠️ Instagram no aceptó la etiqueta {', '.join('@' + u.lstrip('@') for u in etiquetas)}: la historia sale sin etiquetar ({str(e)[:150]})")
+    if cid is None:
+        cid = _graph(f"{uid}/media", campos, post=True)["id"]
     for _ in range(30):
         s = _graph(cid, {"fields": "status_code"})
         if s.get("status_code") == "FINISHED":
@@ -250,7 +262,7 @@ def procesar():
                 it["estado"] = "simulada"
                 avisar(f"🧪 SIMULACRO (no publicado). Imagen: {it['url']}\n{it['texto']}")
             else:
-                it["id"] = publicar_historia(it["url"])
+                it["id"] = publicar_historia(it["url"], it.get("etiquetas"))
                 it["estado"] = "publicada"
                 it["publicada"] = ahora().isoformat()
                 publicadas += 1

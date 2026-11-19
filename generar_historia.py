@@ -1157,6 +1157,16 @@ def _credito_fotos(img, y):
     d.text((x0 + 54, y + 20 - f.size * 0.7), txt, font=f, fill=c)
 
 
+def _arroba(d, y, datos):
+    """v76: @ de Instagram del jugador, como texto en la imagen (Instagram no permite etiquetas pulsables en historias publicadas por API).
+    Devuelve la y siguiente (sin cambios si el jugador no tiene cuenta)."""
+    if not datos.get("instagram"):
+        return y
+    arroba = "@" + datos["instagram"].lstrip("@")
+    center(d, y + 14, arroba, fit(d, arroba, 46, W - 120, 28), fill=WHITE)
+    return y + 74
+
+
 def cumpleanos(datos):
     cara = _cara(datos)
     img = fondo(); d = ImageDraw.Draw(img)
@@ -1213,13 +1223,16 @@ def cumpleanos(datos):
             center(d, y + 10, datos["posicion"], fit(d, datos["posicion"], 46, W - 120, 28), fill=AZUL); y += 80
         if datos.get("fecha"):
             center(d, y + 30, f"{datos['fecha']}", font(50), fill=(200, 218, 240)); y += 90
+        y = _arroba(d, y + 15, datos)
         center(d, max(y + 60, 1380), "Parabéns da Marexada Celeste!", fit(d, "Parabéns da Marexada Celeste!", 52, W - 100, 30))
     else:                                                                 # con foto: posición y fecha en una sola línea, para que quepa también con nombres largos
         meta = " · ".join(x for x in (datos.get("posicion"), datos.get("fecha")) if x)
         if meta:
             center(d, y + 4, meta, fit(d, meta, 44, W - 120, 26), fill=AZUL); y += 64
-        center(d, max(y + 34, 1325), "Parabéns da Marexada Celeste!", fit(d, "Parabéns da Marexada Celeste!", 52, W - 100, 30))
-        _credito_fotos(img, 1408)
+        y = _arroba(d, y - 10, datos)
+        yp = max(y + 34, 1325)
+        center(d, yp, "Parabéns da Marexada Celeste!", fit(d, "Parabéns da Marexada Celeste!", 52, W - 100, 30))
+        _credito_fotos(img, max(1408, yp + 83))
     pie(img, d)
     return img
 

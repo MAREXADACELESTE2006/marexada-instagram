@@ -443,10 +443,13 @@ def plan(hoy, datos, avisos):
         c = datos[fichero]
         if not c or not c.get("nombre"):
             continue
+        mencion = f" @{c['instagram'].lstrip('@')}" if c.get("instagram") else ""                  # v76: se menciona al jugador en el texto
         quien = f"o noso adestrador {c['nombre']}" if "adestrador" in (c.get("posicion") or "").lower() else c["nombre"]
         add(f"cumple-{fichero[10:-5]}-{c.get('año', hoy.year)}", fichero, "mañana", "09:00",
-            f"🎂 O {c['fecha']} cumpre {c['edad']} anos {quien}! Moitas felicidades e que cumpra moitos máis co celeste no peito 💙 {etiquetas(c.get('equipo', 'celta'))}"
+            f"🎂 O {c['fecha']} cumpre {c['edad']} anos {quien}! Moitas felicidades e que cumpra moitos máis co celeste no peito 💙{mencion} {etiquetas(c.get('equipo', 'celta'))}"
             + (" 📸 Fotos: Web oficial del RC Celta (@rccelta)" if c.get("foto") else ""))      # v72: crédito obligatorio cuando se usa la foto del club
+        if c.get("instagram"):
+            out[-1]["etiquetas"] = [c["instagram"].lstrip("@")]                  # v77: mención real al jugador al publicar la historia en Instagram
     return out
 
 
@@ -616,7 +619,7 @@ def main():
         if instagram.activo():
             for h in historias:
                 try:
-                    instagram.encolar(h["clave"], h["imagen"], h["texto"], *ventana_instagram(h))
+                    instagram.encolar(h["clave"], h["imagen"], h["texto"], *ventana_instagram(h), etiquetas=h.get("etiquetas"))
                 except Exception as e:
                     avisos.append(f"Instagram (preparar {h['clave']}): {e}")
 

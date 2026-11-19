@@ -58,6 +58,8 @@ def main():
         d = {"tipo": "cumpleanos", "competicion": "liga", "tag": TAG.get(p.get("equipo"), "REAL CLUB CELTA"), "nombre": p["nombre"],
              "posicion": p.get("posicion", ""), "edad": hoy.year - n.year, "fecha": f"{hoy.day} de {MESES_GL[hoy.month - 1]}",
              "equipo": p.get("equipo", "celta"), "año": hoy.year}
+        if p.get("instagram"):                                                   # v76: cuenta de Instagram del jugador (se pone en la imagen y en el texto)
+            d["instagram"] = p["instagram"].lstrip("@")
         foto = os.path.join("assets", "caras", slug(p["nombre"]) + ".webp")       # v72: cara de la web del club, si la hay (assets/caras/<nombre>.webp)
         if os.path.exists(os.path.join(BASE, foto)):
             d["foto"] = foto.replace(os.sep, "/")

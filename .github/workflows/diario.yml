@@ -14,6 +14,10 @@ on:
       modo:
         description: "completo (todo) o rapido (solo convocatorias y resultados)"
         default: "completo"
+      forzar:
+        description: "Marcar para volver a generar y enviar lo de hoy aunque ya se haya enviado (ignora estado/publicado.json)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write                  # para guardar estado/publicado.json y estado/agenda.json en el repositorio
@@ -43,7 +47,7 @@ jobs:
           IG_TOKEN: ${{ secrets.IG_TOKEN }}
           IG_SIMULACRO: ${{ vars.IG_SIMULACRO }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python diario.py --modo "$MODO"
+        run: python diario.py --modo "$MODO" ${{ (github.event_name == 'workflow_dispatch' && inputs.forzar) && '--forzar' || '' }}
       - name: Publicar en Instagram
         if: always()                   # también si diario.py avisa de un error: lo que ya estaba en cola sigue saliendo
         continue-on-error: true

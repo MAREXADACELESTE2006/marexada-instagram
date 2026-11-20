@@ -1,7 +1,86 @@
-# Marexada Celeste · Instagram automático · v73
+# Marexada Celeste · Instagram automático · v85
 
 Diseños de partido + lector de la web del club (rccelta.es).
-Todavía NO descubre noticias nuevas solo ni publica en Instagram: eso es lo siguiente.
+Descubre las noticias del club, genera las historias y las publica en Instagram (ver las novedades de cada versión).
+
+## Novedades v85
+- **Alineación del Celta (primer equipo) antes del partido, automática.** Nuevo `alineacion.py`: entre 2 h 30 min antes y 10 min después del inicio mira ESPN (`summary?event=ID`, la misma fuente que `directo.py`)
+  y, cuando el once está, escribe `datos_reales/alineacion_celta.json`. `diario.py` la publica como historia («Aliñación! 📋 O once do Celta para o partido…») en el modo rápido, una sola vez por partido.
+- **Diseño nuevo (`_alineacion_posiciones` en `generar_historia.py`):** el once por líneas: **PORTEIRO, DEFENSAS, CENTROCAMPISTAS, DIANTEIROS**, con la **cara** de cada jugador (de `assets/caras/`), su dorsal en una chapa y el apellido debajo
+  («H. Álvarez» si hay dos con el mismo apellido). Sin foto sale el dorsal en el círculo. Los suplentes, en una línea abajo. El crédito de las fotos se añade solo al texto. Vale también para Europa League y Copa (usan su tema).
+  Las alineaciones antiguas (JSON sin `grupos`) siguen saliendo con el diseño de lista de siempre.
+- **Cómo decide la posición de cada jugador** (por este orden): 1.º la abreviatura de ESPN (G, CD-L, LB, DM, AM, F…); 2.º la formación (4-2-3-1) y el lugar de cada titular; 3.º la posición de `cumpleanos.json`.
+  Delanteros incluye a los extremos; centrocampistas, a los pivotes y mediapuntas. **Nunca se publica un once dudoso:** tiene que haber 11 titulares, 1 portero y posiciones claras; si no, no sale nada y se vuelve a intentar en 5 min.
+- **Aviso (importante):** el formato del resumen de ESPN no está documentado y aquí no hay internet. `alineacion.py` se ha probado con `fixtures/espn_alineacion_EJEMPLO.json` (INVENTADO con la forma que creo que tiene ESPN, no es una copia real). Hay que comprobarlo con el primer partido real.
+  Qué mirar: `datos_reales/alineacion_log.txt` en el artifact «historias» (dice si ESPN no traía el once). Prueba sin internet: `python alineacion.py --desde fixtures/espn_alineacion_EJEMPLO.json --ahora 2026-11-22T18:30:00`.
+- **Reserva con besoccer: todavía NO funciona.** Si ESPN no da el once, a 40-60 min del partido se guarda la página de besoccer en `datos_reales/alineacion_besoccer_RAW.html` (la dirección `.../equipo/partidos/rc-celta` es una suposición) pero NO se interpreta:
+  hace falta una copia real de la página de alineaciones para escribir el lector. Mientras tanto, la alineación solo sale si ESPN la trae.
+- Se añade `alineacion.py` a las fuentes del modo rápido y `alineacion-` a las historias del modo rápido (`diario.py`). `diario.yml` no cambia.
+
+## Novedades v84
+- **Historia de gol:** el logo de la competición es más grande (190 px, antes 112) y sube para no dejar hueco encima. **Sin la cara del goleador** (`CARAS_EN_GOL = False` por defecto);
+  la etiqueta de Instagram al goleador se mantiene, con una píldora «@cuenta» bajo el nombre.
+- **Nuevas historias en directo (solo Celta):** «¡ROJA DIRECTA!» y «¡DOBLE AMARILLA!» (icono de tarjeta roja, o amarilla+roja) cuando es expulsado un jugador del Celta **o del rival**,
+  y «¡PENALTI PARADO!» cuando el Celta detiene un penalti. Salen de `directo.py` (`directo_celta_tarjeta_NN.json`, `directo_celta_penalti_NN.json`) y llevan el estilo de la competición (Europa, Copa...).
+  **Aviso:** ESPN no documenta su formato; el motor lee banderas (`redCard`, `yellowCard`) y el texto del evento. Es doble amarilla si el texto lo dice o si el jugador ya tenía una amarilla antes en el partido.
+  El penalti solo se publica si se sabe que lo lanza el rival y que fue «parado» (no «fallado»). Hay que comprobarlo con el primer partido real. Prueba sin internet: `python directo.py --desde fixtures/espn_directo_tarjetas_EJEMPLO.json`.
+- **Resultado final:** escudos más grandes (y el marcador algo más pequeño cuando hay goleadores, para dar sitio a escudos y caras). Con muchos goleadores el espacio manda y todo se hace algo más pequeño.
+- `caras.py`: `posicion_de(nombre)` (se usa para saber si el nombre de un penalti parado es un portero del Celta).
+
+## Novedades v83
+- **Caras más grandes en el resultado final:** las caras de los goleadores del Celta crecen (hasta ~96 px con pocos goles) y se ve la cabeza entera. Para darles sitio, cuando el resultado lleva caras
+  el marcador se reduce un poco; con muchos goleadores las caras se hacen más pequeñas (se adaptan al espacio). La historia de gol se queda igual que en la v82.
+
+## Novedades v82
+- **Rediseño de la cara del goleador en la historia de gol:** ya no es un círculo pequeño. El jugador va recortado, sobre el fondo, con un resplandor detrás y el nombre justo debajo;
+  la línea «@cuenta» va en una píldora bajo la barbilla (la mención de Instagram se pone encima). El tamaño de la cara se calcula según el hueco (nombre en dos líneas, «de penalti»...).
+- **Interruptores** al principio de `generar_historia.py`: `CARAS_EN_GOL = False` quita la cara (y con ella la etiqueta y el crédito) de las historias de gol;
+  `CARAS_EN_RESULTADO = False` quita las caras de la lista de goleadores del resultado. Basta cambiar `True` por `False` y subir el archivo.
+
+## Novedades v81
+- **Historia de gol:** etiqueta (mención pulsable) al goleador cuando es del primer equipo y se conoce su Instagram. Se reserva una línea «@cuenta» bajo su foto y la mención se coloca encima.
+  El texto sugerido también lo menciona. Si Instagram rechaza la cuenta, la historia sale igual sin etiquetar y Telegram avisa.
+- **Resultado final:** los goleadores del Celta (primer equipo) llevan su cara en la lista de goleadores. Sin foto para el Fortuna, el femenino ni los goles en propia puerta.
+- **Crédito automático:** siempre que una historia lleva caras (goles, resultados, cumpleaños), el texto sugerido añade «📸 Fotos: Web oficial del RC Celta (@rccelta)» (`retocar_tras_generar` en `diario.py`).
+- `caras.py`: `instagram_de(nombre)` devuelve la cuenta del jugador reconocido.
+
+## Novedades v80
+- **Gol en directo de Europa League:** ahora lleva el fondo del estadio de Europa y los colores de Europa (naranja), como el resto de historias europeas. Antes salía con la grada de LaLiga.
+  Lo decide `foto_especial()` en `generar.py` (partidos con `logo: europa`); los goles de las demás competiciones no cambian.
+
+## Novedades v79 (importante: arreglo de historias que no se generaban)
+- **ERROR CORREGIDO desde la v71:** `generar_historia.py` tenía la función `_brillo` definida dos veces con parámetros distintos (la de «Tesouros Celestes» pisaba a la de partidos).
+  Por eso **no se generaban las historias de próximo partido, resultado, gol ni directo (inicio/descanso)**. Ahora la segunda se llama `_brillo_suave`. Probadas las 27 historias de ejemplo y datos reales.
+- **Foto del goleador** en la historia de gol (`caras.py` busca la cara por el nombre: «Iago Aspas», «I. Aspas» o «Aspas»). Si hay duda (nombre de pila suelto, jugador sin foto) o es gol en propia puerta,
+  la historia sale como siempre, sin foto. Con foto, el diseño se compacta y lleva el crédito «Fotos: Web oficial del RC Celta (@rccelta)», también en el texto.
+- **Aviso por Telegram si el motor falla** (solo ejecuciones completas o lanzadas a mano; las rápidas no avisan por fallos puntuales de red). Va en `diario.yml`.
+- Token de Instagram: según esta guía (paso 3) es el `access_token` de la página, que no caduca; por eso no se añade aviso de caducidad.
+
+## Novedades v78
+- Cuentas de Instagram añadidas a Coke Carrillo, Caio Barone, Joel López, Óscar Marcos y Stefan Bajcetic (solo `cumpleanos.json`). Solo falta Fredi Álvarez.
+
+## Novedades v77 (etiqueta de verdad al jugador en la historia de cumpleaños)
+- **Corrección de lo dicho en v76:** la API de Instagram **sí** permite mencionar usuarios en historias (`user_tags`, desde julio de 2025). La v77 lo usa:
+  la historia de cumpleaños sale con la mención pulsable a la cuenta del jugador (sobre la línea «@cuenta» de la imagen). La cuenta se guarda en la cola (`etiquetas`).
+- Si Instagram rechaza la etiqueta (cuenta mal escrita, inexistente...), la historia **se publica igual sin etiquetar** y Telegram avisa de qué cuenta falló.
+- No he podido probarlo contra Instagram real desde aquí (solo con una API simulada). Compruébalo con el próximo cumpleaños; hay que tener en cuenta que el permiso
+  `instagram_business_content_publish`/`instagram_content_publish` de tu token debe estar activo (el mismo que ya usas para publicar).
+
+## Novedades v76 (cuentas de Instagram en los cumpleaños)
+- `cumpleanos.json` lleva ahora el campo `"instagram"` de 28 jugadores (sin la @). Sin cuenta: Coke Carrillo, Caio Barone, Joel López, Óscar Marcos, Stefan Bajcetic y Fredi Álvarez; añadirla es poner `"instagram": "cuenta"` en su línea.
+- La historia de cumpleaños muestra **@cuenta** bajo el nombre, y el texto sugerido (Telegram) la menciona. **Ojo:** en la imagen es solo texto; Instagram no permite
+  etiquetas pulsables en historias publicadas por API (eso solo se puede poner a mano al subirla desde el móvil).
+- `diario.yml` (v75): casilla **forzar** en «Run workflow» para volver a generar lo de hoy aunque ya esté enviado.
+
+## Novedades v75 (arreglo del paso de guardado de la v74: `pull --rebase --autostash`, que fallaba si había archivos modificados sin guardar)
+
+## Novedades v74 (historias repetidas: parte médico y clasificación)
+- **Causa 1 (mía): el zip llevaba `estado/publicado.json` vacío (`{}`).** Al subir una versión nueva por la web de GitHub, ese archivo pisaba la lista de
+  lo ya publicado y la siguiente ejecución volvía a generar y mandar todo lo de «hoy» (parte médico del Celta y del Fortuna, clasificación...).
+  **Ahora el zip NO lleva la carpeta `estado/`**: al subir la versión nueva no se toca el estado del repositorio. (No subas nunca `estado/` desde un zip.)
+- **Causa 2: el guardado del estado podía fallar sin avisar.** Si durante la ejecución entraba algo en `main` (una subida a mano), el `git push`
+  se rechazaba y `publicado.json` no se guardaba. Ahora el paso «Recordar lo ya generado» hace `pull --rebase` y reintenta (4 veces) y, si no puede, falla
+  en rojo para que se vea. **Este cambio es de `.github/workflows/diario.yml`: hay que reemplazar ese archivo en GitHub a mano.**
 
 ## Novedades v73 (las 10 caras que faltaban y la fecha de Hugo Burcio)
 - **Hugo Burcio cumple el 31/10/2006** (se quita «pendiente» de `cumpleanos.json`): ya sale en las historias de cumpleaños el 31 de octubre, con su foto.

@@ -39,8 +39,8 @@ MIN_RAPIDO = {"rccelta.es": float(os.environ.get("MIN_RCCELTA", "60")),         
               "besoccer.com": float(os.environ.get("MIN_BESOCCER", "10")),      # webs que se leen como página (HTML): sin prisas
               "futbolme.com": float(os.environ.get("MIN_FUTBOLME", "10"))}
 AGENDA = os.path.join(BASE, "estado", "agenda.json")           # fechas de los partidos cercanos (la usa el modo rápido para saber si hay algo que vigilar)
-RAPIDAS = {"calendario.py", "noticias.py", "resultados.py", "futbolme.py", "besoccer.py", "directo.py"}     # fuentes del modo rápido: convocatorias y resultados
-CLAVES_RAPIDAS = ("convocatoria-", "cronica-", "resultado-", "inicio-", "descanso-", "gol-")
+RAPIDAS = {"calendario.py", "noticias.py", "resultados.py", "futbolme.py", "besoccer.py", "directo.py", "alineacion.py"}     # fuentes del modo rápido: convocatorias y resultados
+CLAVES_RAPIDAS = ("convocatoria-", "cronica-", "resultado-", "inicio-", "descanso-", "gol-", "alineacion-")
 HASHTAGS = "#RCCelta #Celta #MarexadaCeleste"
 
 RECORDATORIOS = {
@@ -402,6 +402,10 @@ def plan(hoy, datos, avisos):
         add(f"resultado-{nombre}-{r['fecha_hora']}-{r['goles_local']}-{r['goles_visitante']}" + ("-g" if con_gol else ""), fichero, "resultado", "xusto ao rematar o partido",
             f"Final: {nombre_lado(r, 'local')} {r['goles_local']} - {r['goles_visitante']} {nombre_lado(r, 'visitante')}. {cierre} 💙 {etiquetas(nombre)}{aviso_gol}")
 
+    al = datos.get("alineacion_celta.json")                          # v85: once del Celta antes del partido (ESPN), por posiciones y con caras
+    if al and al.get("grupos") and al.get("_fecha") == hoy.isoformat():
+        add(f"alineacion-celta-{al['_fecha']}-{al['_id']}", "alineacion_celta.json", "resultado", "xusto agora (antes do partido)",
+            f"Aliñación! 📋 O once do Celta para o partido: {nombre_lado(al, 'local')} - {nombre_lado(al, 'visitante')}. Forza Celta! 💙 {HASHTAGS}")
     for nombre, quien in (("celta", "Celta"), ("fortuna", "Celta Fortuna")):          # v53: directo del Celta y del Celta Fortuna: inicio y descanso
         dv = datos.get(f"directo_{nombre}_inicio.json")
         if dv:
@@ -539,6 +543,8 @@ def ventana_instagram(h, t=None):
     c = h["clave"]
     if c.startswith(("gol-", "inicio-", "descanso-")):
         hasta = desde + datetime.timedelta(minutes=45)
+    elif c.startswith("alineacion-"):
+        hasta = desde + datetime.timedelta(minutes=90)             # v85: la alineación solo vale justo antes del partido
     elif c.startswith(("resultado-", "cronica-")):
         hasta = desde + datetime.timedelta(hours=8)
     elif c.startswith("convocatoria-"):
@@ -592,6 +598,7 @@ def main():
             ("noticias.py", ["--salida", d_datos], "Noticias rccelta.es"),
             ("resultados.py", ["--ahora", ahora, "--salida", d_datos], "Resultados Celta/Fortuna"),
             ("directo.py", ["--salida", d_datos], "Celta y Celta Fortuna en directo"),
+            ("alineacion.py", ["--ahora", ahora, "--salida", d_datos], "Alineación del Celta (ESPN)"),     # v85
             ("futbolme.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "AS Celtas Fem (futbolme)"),
             ("partemedico.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Parte médico (rccelta.es)"),
             ("entradas.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Entradas (rccelta.es)"),
@@ -674,7 +681,7 @@ def main():
     else:
         L.append("Hoy no hay historias automáticas nuevas.")
     L += ["", "## Contido propio que toca hoxe (aínda sen automatizar)"] + [f"- {r}" for r in RECORDATORIOS[hoy.weekday()]]
-    L += ["- Aliñación do Celta e do Fortuna: non se xera (non fai falta)."]
+    L += ["- Aliñación do Fortuna: non se xera. A do Celta sae soa (ESPN) cando se coñece o once."]
     L_tg = list(L)                                             # lo que llega a Telegram: sin el control de actualidad (ocupa mucho; sigue en resumen.md)
     if controles:
         L += ["", "## Control de actualidad"] + [f"- {x}" for x in controles]

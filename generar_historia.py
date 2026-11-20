@@ -570,6 +570,8 @@ def convocatoria(datos):
 
 
 def _alineacion(datos, s):
+    if datos.get("grupos"):
+        return _alineacion_posiciones(datos, s)               # v85: por posiciones y con caras
     img = fondo(); d = ImageDraw.Draw(img)
     yl = _cab_texto(img, d, "ALIÑACIÓN", _tag_v33(datos))
     r = int(98 * s)
@@ -599,6 +601,71 @@ def _alineacion(datos, s):
             col, fila = divmod(i, f2)
             _tarjeta_jugador(img, d, 62 + col * 489, ys + fila * (ph + 10), 467, ph, j.get("dorsal"), j["nombre"], j.get("pos"))
         fin = ys - 12 + alto2
+    return img, fin
+
+
+def _alineacion_posiciones(datos, s):
+    """v85: el once por líneas (portero, defensas, centrocampistas, dianteiros), cada jugador con su cara (o su dorsal si no hay foto)."""
+    import caras
+    img = fondo(); d = ImageDraw.Draw(img)
+    yl = _cab_texto(img, d, "ALIÑACIÓN", _tag_v33(datos))
+    sh = s * 0.72                                                 # cabecera más baja que en la lista: las caras necesitan sitio
+    r0 = int(98 * sh)
+    yp = _bloque_centro_logo(img, d, datos, yl + r0 + 30, r0, int(36 * sh), sh) + int(14 * sh)
+    linea = _fecha_linea(datos)
+    if linea:
+        yp = _pildora_fecha(img, d, yp, linea, sub=datos.get("lugar"))
+    grupos = [g for g in datos["grupos"] if g.get("jugadores")]
+    sup = [j["nombre"] for j in datos.get("suplentes", []) if j.get("nombre")]
+    f_sup = font_m(26)
+    lin_sup = _lineas(d, "  ·  ".join(sup), f_sup, W - 140, maximo=2) if sup else []
+    alto_sup = (46 + len(lin_sup) * 34 + 16) if lin_sup else 0
+    y0 = yp + 24
+    libre = FIN_CONTENIDO - y0 - alto_sup - 20
+    por_fila = libre / max(len(grupos), 1)
+    TIT, NOM, GAP = 34, 44, 6                                    # rótulo de la línea, nombre, aire entre líneas
+    r = int(max(34, min(92, (por_fila - TIT - NOM - GAP) / 2)))
+    alto_fila = TIT + 2 * r + NOM + GAP
+    _rgba(img, [40, y0 - 10, W - 40, y0 - 10 + alto_fila * len(grupos) + 12], 30, (4, 12, 30, 105))
+    usa_fotos = False
+    for gi, g in enumerate(grupos):
+        yf = y0 + gi * alto_fila
+        f_t = font(24)
+        center(d, yf, g["titulo"], f_t, fill=AZUL)
+        js = g["jugadores"]
+        ancho = (W - 100) / max(len(js), 5)                                   # hueco de cada jugador (el de las filas de 5 manda; las cortas se centran)
+        x_ini = W / 2 - ancho * len(js) / 2
+        cy = yf + TIT + r + 2
+        for i, j in enumerate(js):
+            cx = x_ini + ancho * (i + 0.5)
+            ruta = caras.buscar(j.get("completo") or j["nombre"])
+            if ruta:
+                _avatar(img, ruta, cx, cy, r)
+                usa_fotos = True
+            else:
+                d.ellipse([cx - r - 3, cy - r - 3, cx + r + 3, cy + r + 3], fill=WHITE)
+                d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=AZUL)
+                if j.get("dorsal"):
+                    fd = fit(d, str(j["dorsal"]), r * 1.1, r * 1.5, 14)
+                    tw = d.textlength(str(j["dorsal"]), font=fd)
+                    d.text((cx - tw / 2, cy - fd.size * 0.70), str(j["dorsal"]), font=fd, fill=NAVY)
+            if j.get("dorsal") and ruta:                          # dorsal en una chapa abajo a la izquierda
+                rb = max(14, int(r * 0.34)); bx, by = cx - r * 0.72, cy + r * 0.72
+                d.ellipse([bx - rb - 2, by - rb - 2, bx + rb + 2, by + rb + 2], fill=WHITE)
+                d.ellipse([bx - rb, by - rb, bx + rb, by + rb], fill=NAVY)
+                fb = fit(d, str(j["dorsal"]), rb * 1.15, rb * 1.5, 10)
+                d.text((bx - d.textlength(str(j["dorsal"]), font=fb) / 2, by - fb.size * 0.70), str(j["dorsal"]), font=fb, fill=WHITE)
+            fn = fit(d, j["nombre"], 30, ancho - 10, 15)
+            center(d, cy + r + 8, j["nombre"], fn, x=int(cx))
+    fin = y0 - 10 + alto_fila * len(grupos) + 12
+    if lin_sup:
+        ys = fin + 14
+        d.text((70, ys), "SUPLENTES", font=font(26), fill=AZUL)
+        for k, t in enumerate(lin_sup):
+            d.text((70, ys + 44 + k * 34), t, font=f_sup, fill=WHITE)
+        fin = ys + alto_sup
+    if usa_fotos:
+        globals()["USO_FOTOS"] = True
     return img, fin
 
 

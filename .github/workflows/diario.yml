@@ -86,3 +86,16 @@ jobs:
             echo "::error::No se pudo guardar estado/ en el repositorio; la próxima ejecución puede repetir historias"
             exit 1
           fi
+      - name: Avisar por Telegram si el motor falla
+        if: failure() && env.MODO == 'completo'
+        continue-on-error: true
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          # v79: aviso directo a Telegram cuando una ejecución completa (o lanzada a mano) termina en error. Las ejecuciones rápidas no avisan (fallos puntuales de red).
+          if [ -n "$TELEGRAM_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+            curl -s -m 20 "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+              --data-urlencode "text=⚠️ El motor de historias ha fallado. Revisa la ejecución: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" > /dev/null || true
+          fi

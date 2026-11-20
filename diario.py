@@ -73,6 +73,20 @@ def cargar(ruta):
         return None
 
 
+CREDITO_FOTOS = "📸 Fotos: Web oficial del RC Celta (@rccelta)"
+
+
+def retocar_tras_generar(h):
+    """v80: justo después de dibujar la imagen de una historia: si lleva caras de jugadores, el texto lleva el crédito de la web del club;
+    y la mención a un jugador se coloca donde la imagen indica (si no indica nada, Instagram usa el sitio por defecto)."""
+    import generar_historia as HIST
+    if HIST.USO_FOTOS and CREDITO_FOTOS not in h["texto"]:
+        h["texto"] += " " + CREDITO_FOTOS
+    if h.get("etiquetas"):
+        xy = HIST.ULTIMA_ETIQUETA
+        h["etiquetas"] = [{"username": u, "x": xy[0], "y": xy[1]} if (xy and isinstance(u, str)) else u for u in h["etiquetas"]]
+
+
 def fecha_de(d):
     try:
         return datetime.date.fromisoformat(d["_fecha"])
@@ -403,9 +417,35 @@ def plan(hoy, datos, avisos):
             continue
         quien = re.sub(r"[^a-z0-9]+", "-", unicodedata.normalize("NFKD", g["goleador"]).encode("ascii", "ignore").decode().lower()).strip("-")
         extra = {"penalti": " (de penalti)", "propia": " (en propia porta)"}.get(g.get("modo"), "")
+        cuenta = None if g.get("modo") == "propia" else caras.instagram_de(g["goleador"])          # v80: mención real al goleador (solo si es del Celta y sabemos su cuenta)
+        mencion = f" @{cuenta}" if cuenta else ""
         add(f"gol-celta-{g['_fecha']}-{g['_id']}-{g['_n']}-{g['goles_local']}-{g['goles_visitante']}-{quien}", fichero, "resultado", "xusto agora (en directo)",
-            f"GOOOOOOL! ⚽ {g['goleador']}{extra} ({g['minuto']}). {nombre_lado(g, 'local')} {g['goles_local']} - {g['goles_visitante']} {nombre_lado(g, 'visitante')}. Forza Celta! 💙 {HASHTAGS}"
-            + (" 📸 Fotos: Web oficial del RC Celta (@rccelta)" if g.get("modo") != "propia" and caras.buscar(g["goleador"]) else ""))      # v79: crédito cuando sale la cara del goleador
+            f"GOOOOOOL! ⚽ {g['goleador']}{mencion}{extra} ({g['minuto']}). {nombre_lado(g, 'local')} {g['goles_local']} - {g['goles_visitante']} {nombre_lado(g, 'visitante')}. Forza Celta! 💙 {HASHTAGS}"
+)
+        if cuenta:
+            out[-1]["etiquetas"] = [cuenta]
+    # v84: expulsiones (roja directa / doble amarilla, de cualquier equipo) y penaltis que para el Celta, en directo
+    for fichero in sorted(f for f in datos if re.fullmatch(r"directo_celta_tarjeta_\d+\.json", f)):
+        t = datos[fichero]
+        if not t or not t.get("goleador"):
+            continue
+        quien = re.sub(r"[^a-z0-9]+", "-", unicodedata.normalize("NFKD", t["goleador"]).encode("ascii", "ignore").decode().lower()).strip("-")
+        marcador = f"{nombre_lado(t, 'local')} {t['goles_local']} - {t['goles_visitante']} {nombre_lado(t, 'visitante')}"
+        donde = f" ({t['equipo']})" if t.get("equipo") else ""
+        if t.get("clase") == "doble":
+            texto = f"🟨🟥 Dobre amarela e expulsión de {t['goleador']}{donde} no minuto {t['minuto'].rstrip(chr(39))}. {marcador}. {HASHTAGS}"
+        else:
+            texto = f"🟥 Tarxeta vermella directa para {t['goleador']}{donde} no minuto {t['minuto'].rstrip(chr(39))}. {marcador}. {HASHTAGS}"
+        add(f"tarjeta-celta-{t['_fecha']}-{t['_id']}-{quien}-{t.get('clase', 'roja')}", fichero, "resultado", "xusto agora (en directo)", texto)
+    for fichero in sorted(f for f in datos if re.fullmatch(r"directo_celta_penalti_\d+\.json", f)):
+        t = datos[fichero]
+        if not t or not t.get("minuto"):
+            continue
+        marcador = f"{nombre_lado(t, 'local')} {t['goles_local']} - {t['goles_visitante']} {nombre_lado(t, 'visitante')}"
+        quien_para = f"{t['portero']} detén" if t.get("portero") else "O Celta detén"
+        de_quen = f" o penalti de {t['lanzador']} ({t['rival']})" if t.get("lanzador") else " un penalti"
+        add(f"penalti-parado-{t['_fecha']}-{t['_id']}-{re.sub(r'[^0-9]+', '', t['minuto'])}", fichero, "resultado", "xusto agora (en directo)",
+            f"🧤 PENALTI PARADO! {quien_para}{de_quen} no minuto {t['minuto'].rstrip(chr(39))}. {marcador}. Forza Celta! 💙 {HASHTAGS}")
 
     tabla = {0: ("clasificacion_celta_laliga.json", "laliga", "LaLiga"), 1: ("clasificacion_celta_fortuna.json", "fortuna", "LaLiga Hypermotion (Celta Fortuna)"),
              3: ("clasificacion_as_celtas_fem.json", "as-celtas-fem", "Segunda Federación Femenina (AS Celtas)")}.get(wd)
@@ -612,6 +652,7 @@ def main():
         h["imagen"] = os.path.join(carpeta, f"{i:02d}_{limpio}.jpg")
         try:
             generar.generar(os.path.join(d_datos, h["fichero"]), h["imagen"])
+            retocar_tras_generar(h)
         except Exception as e:
             avisos.append(f"No se pudo generar {h['clave']}: {e}")
             h["imagen"] = None

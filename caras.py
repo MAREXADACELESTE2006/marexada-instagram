@@ -26,7 +26,7 @@ def _candidatos():
     for p in personas:
         ruta = os.path.join(BASE, "assets", "caras", _slug(p["nombre"]) + ".webp")
         if os.path.exists(ruta):
-            out.append((_slug(p["nombre"]).split("-"), ruta))
+            out.append((_slug(p["nombre"]).split("-"), ruta, (p.get("instagram") or "").lstrip("@"), p.get("posicion") or ""))
     return out
 
 
@@ -35,7 +35,7 @@ def buscar(nombre):
     if not s:
         return None
     cands = _candidatos()
-    for toks, ruta in cands:                                       # nombre completo
+    for toks, ruta, _ig, _pos in cands:                                  # nombre completo
         if "-".join(toks) == s:
             return ruta
     partes = s.split("-")
@@ -43,9 +43,27 @@ def buscar(nombre):
     resto = [p for p in partes if len(p) > 1]
     if not resto:
         return None
-    ok = [(t, r) for t, r in cands if all(x in t for x in resto) and all(t[0].startswith(i) for i in iniciales)]
+    ok = [(t, r) for t, r, _ig, _pos in cands if all(x in t for x in resto) and all(t[0].startswith(i) for i in iniciales)]
     if len(ok) == 1 and (iniciales or len(resto) >= 2 or resto[0] != ok[0][0][0]):      # un nombre de pila suelto («Hugo», «Javi») nunca vale
         return ok[0][1]
+    return None
+
+
+def instagram_de(nombre):
+    """v80: cuenta de Instagram (sin @) del jugador que reconoce buscar(), o None."""
+    ruta = buscar(nombre)
+    for _t, r, ig, _pos in _candidatos():
+        if r == ruta:
+            return ig or None
+    return None
+
+
+def posicion_de(nombre):
+    """v84: posición (en gallego, p. ej. «Porteiro») del jugador del primer equipo que reconoce buscar(), o None."""
+    ruta = buscar(nombre)
+    for _t, r, _ig, pos in _candidatos():
+        if r == ruta:
+            return pos or None
     return None
 
 

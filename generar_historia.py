@@ -379,6 +379,12 @@ def _agrupar_goles(lista):
 
 
 
+CARAS_EN_GOL = False        # v82: ponerlo a False para que la historia de gol salga sin la cara del goleador (la etiqueta de Instagram se mantiene, con una píldora «@cuenta»)
+CARAS_EN_RESULTADO = True   # v82: ídem para las caras en la lista de goleadores del resultado final
+USO_FOTOS = False           # v80: la historia que se acaba de dibujar lleva caras de jugadores (generar.py lo pone a False antes; diario.py añade el crédito al texto)
+ULTIMA_ETIQUETA = None      # v80: (x, y) en proporción de la imagen donde colocar la mención al goleador en Instagram
+
+
 PIE_Y = 1466                # el pie (escudos de la peña + web) ocupa de 1466 a 1690, dentro de la zona segura
 FIN_CONTENIDO = PIE_Y - 18
 
@@ -681,13 +687,56 @@ def proximo(datos):
     return img
 
 
-def _resultado(datos, s, hg=0):
+def _fotos_resultado(datos):
+    """v80: {nombre: ruta de la cara} de los goleadores del Celta (primer equipo) en un resultado. Sin foto para el Fortuna, el femenino ni los goles en propia puerta."""
+    if not CARAS_EN_RESULTADO or (datos.get("tag") or "REAL CLUB CELTA") != "REAL CLUB CELTA":
+        return {}
+    lado = "local" if datos.get("local") == "celta-vigo" else "visitante" if datos.get("visitante") == "celta-vigo" else None
+    if not lado:
+        return {}
+    try:
+        import caras
+    except Exception:
+        return {}
+    out = {}
+    for nom, _m in _agrupar_goles(datos.get("goleadores_" + lado, [])):
+        if re.search(r"\(|p\.?\s?p\b|propia", nom.lower()):
+            continue
+        ruta = caras.buscar(nom)
+        if ruta:
+            out[nom] = ruta
+    return out
+
+
+def _avatar(img, ruta, cx, cy, r):
+    """Cara pequeña en círculo (aro blanco) para la lista de goleadores."""
+    cx, cy, r = int(round(cx)), int(round(cy)), int(round(r))
+    cara = Image.open(ruta).convert("RGBA")
+    ancho = int(2.4 * r)                                        # v83: la cabeza entera (de la coronilla a la barbilla) cabe en el círculo
+    cara = cara.resize((ancho, int(cara.height * ancho / cara.width)), Image.LANCZOS)
+    arriba = cara.getchannel("A").getbbox()[1]
+    d = ImageDraw.Draw(img)
+    d.ellipse([cx - r - 3, cy - r - 3, cx + r + 3, cy + r + 3], fill=WHITE)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=AZUL)
+    capa = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    capa.paste(cara, (cx - ancho // 2, cy - r + 2 - arriba), cara)
+    mascara = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(mascara).ellipse([cx - r, cy - r, cx + r, cy + r], fill=255)
+    from PIL import ImageChops
+    capa.putalpha(ImageChops.multiply(capa.getchannel("A"), mascara))
+    img.paste(capa, (0, 0), capa)
+
+
+def _resultado(datos, s, hg=0, rh_min=40):
     img = fondo(); d = ImageDraw.Draw(img)
     yl = _cab_logo(img, d, datos.get("titulo") or "RESULTADO FINAL", _tag_v33(datos), datos.get("logo"), s)
     gl = _agrupar_goles(datos.get("goleadores_local", []))
     gv = _agrupar_goles(datos.get("goleadores_visitante", []))
     hay = bool(gl or gv)
-    r = int((96 if hay else 118) * s)
+    fotos = _fotos_resultado(datos) if hay else {}                # v80: caras de los goleadores del Celta
+    if fotos:
+        globals()["USO_FOTOS"] = True
+    r = int((124 if hay else 150) * s)                             # v84: escudos más grandes en el resultado final
     cy = yl + r + 28
     try:
         ga, gb = int(datos["goles_local"]), int(datos["goles_visitante"])
@@ -697,7 +746,7 @@ def _resultado(datos, s, hg=0):
     fin = _bloque_partido(img, d, datos, cy, r=r, centro=None, cx=(270, 810), tam=int(36 * s), brillo=ganador)
     d = ImageDraw.Draw(img)
     a, b = str(datos["goles_local"]), str(datos["goles_visitante"])
-    tam = int((320 if hay else 430) * s)
+    tam = int((276 if hay else 430) * s)                           # v84: con goleadores, el marcador algo más pequeño para dar sitio a escudos y caras más grandes
     hueco = 52
     while tam > 100:
         f = font(tam)
@@ -728,26 +777,56 @@ def _resultado(datos, s, hg=0):
     if hay:
         filas = max(len(gl), len(gv))
         y0 = yp + 30 + hg
-        rh = max(40, min(66, (FIN_CONTENIDO - y0 - 100) // max(filas, 1)))
+        rh = max(rh_min, min(112 if fotos else 66, (FIN_CONTENIDO - y0 - (150 if fotos else 100)) // max(filas, 1)))     # v83: con caras, filas más altas (caras más grandes)
         alto = 78 + filas * rh + 16
         _rgba(img, [40, y0, W - 40, y0 + alto], 30, (4, 12, 30, 115), borde=AZUL + (75,), grosor=3)
         center(d, y0 + 16, "GOLEADORES", font(28), fill=AZUL)
         d.line([(W // 2, y0 + 70), (W // 2, y0 + alto - 20)], fill=(255, 255, 255, 60), width=2)
+        dd = min(96, rh - 14) if fotos else min(52, rh - 4)         # v83: diámetro de la cara (hasta 100 px con pocas filas)
+        grande = bool(fotos) and rh > 70
+        col_celta = gl if datos.get("local") == "celta-vigo" else gv
         for lista, x in ((gl, 70), (gv, 570)):   # columnas de 440 px
+            xn = max(48, dd + 16) if (fotos and lista is col_celta) else 48          # los nombres se alinean tras la cara solo en la columna del Celta
             for i, (nom, mins) in enumerate(lista[:7]):
                 yy = y0 + 78 + i * rh + rh // 2
-                _balon(d, x + 18, yy, 16)
+                if fotos and lista is col_celta and nom in fotos:
+                    _avatar(img, fotos[nom], x + 4 + dd // 2, yy, dd // 2)
+                    d = ImageDraw.Draw(img)
+                elif fotos and lista is col_celta:
+                    _balon(d, x + 4 + dd // 2, yy, 16)                               # sin cara: el balón, centrado en el hueco de la cara
+                else:
+                    _balon(d, x + 18, yy, 16)
                 txt_m = " · ".join(mins)
-                fm = font(30)
+                fm = font(34 if grande else 30)
                 wm = d.textlength(txt_m, font=fm)
                 d.text((x + 440 - wm, yy - fm.size * 0.70), txt_m, font=fm, fill=AZUL)
-                fn = fit(d, nom, 34, 440 - 48 - wm - 24, 20)
-                d.text((x + 48, yy - fn.size * 0.70), nom, font=fn, fill=WHITE)
+                fn = fit(d, nom, 38 if grande else 34, 440 - xn - wm - 20, 20)
+                d.text((x + xn, yy - fn.size * 0.70), nom, font=fn, fill=WHITE)
         yp = y0 + alto
+        if fotos:
+            _credito_fotos(img, yp + 10)
+            yp += 50
     return img, yp
 
 
 def resultado(datos):
+    fotos = _fotos_resultado(datos)
+    if fotos:                                                    # v84: con caras, los escudos tienen prioridad (nunca por debajo de 0,8) y las caras se adaptan al hueco
+        filas = max(len(_agrupar_goles(datos.get("goleadores_local", []))), len(_agrupar_goles(datos.get("goleadores_visitante", []))), 1)
+        deseada = 84 if filas <= 3 else 72 if filas == 4 else 62 if filas == 5 else 52
+        elegido = None
+        d85, d72 = int(deseada * 0.85), int(deseada * 0.72)
+        for s, rh_min in ((1.0, deseada), (0.95, deseada), (0.9, deseada), (0.85, deseada), (0.9, d85), (0.8, deseada), (0.85, d85), (0.8, d85), (0.75, deseada),
+                          (0.8, d72), (0.7, deseada), (0.7, d85), (0.65, d85), (0.6, d72), (0.6, 40)):          # de más a menos preferido: escudo grande y cara grande
+            img, fin = _resultado(datos, s, 0, rh_min)
+            if fin <= FIN_CONTENIDO:
+                elegido = (s, rh_min, fin)
+                break
+        s, rh_min, fin = elegido or (0.6, 40, fin)
+        hg = max(0, min(50, (FIN_CONTENIDO - fin) / 3))
+        img, fin = _resultado(datos, s, hg, rh_min)
+        _pie_v39(img, ImageDraw.Draw(img))
+        return img
     s_ok = 0.6
     for s in (1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6):
         img, fin = _resultado(datos, s)
@@ -1404,9 +1483,21 @@ def _brillo(img, caja, color, alpha=210, desenfoque=24):
     img.paste(cap, (0, 0), cap)
 
 
+def _tarjeta_icono(d, cx, cy, alto, doble=False):
+    """v84: tarjeta roja; con doble=True, una amarilla detrás y la roja delante (doble amarilla = expulsión)."""
+    w = int(alto * 0.70)
+    def carta(x, y, color):
+        d.rounded_rectangle([x - w // 2, y - alto // 2, x + w // 2, y + alto // 2], max(4, int(w * 0.14)), fill=color, outline=(255, 255, 255), width=3)
+    if doble:
+        carta(int(cx - w * 0.36), int(cy - alto * 0.05), (250, 204, 38))
+        carta(int(cx + w * 0.36), int(cy + alto * 0.05), (226, 28, 36))
+    else:
+        carta(cx, cy, (226, 28, 36))
+
+
 def _foto_goleador(datos):
     """v79: cara del goleador (assets/caras) o None. En un gol en propia puerta el goleador es del rival: nunca se pone foto."""
-    if (datos.get("modo") or "").lower() == "propia":
+    if not CARAS_EN_GOL or (datos.get("modo") or "").lower() == "propia" or datos.get("tipo") not in (None, "gol"):
         return None
     try:
         import caras
@@ -1435,19 +1526,36 @@ def _cara_gol(img, cara, cx, cy, r):
     img.paste(capa, (0, 0), capa)
 
 
+def _cara_grande(img, cara, cx, ytop, ancho, alto, fundido):
+    """v82: el jugador recortado, grande, con un resplandor detrás y el borde de abajo difuminado (el nombre se monta encima)."""
+    from PIL import ImageChops
+    k = ancho / cara.width
+    c = cara.resize((ancho, int(cara.height * k)), Image.LANCZOS)
+    t = c.getchannel("A").getbbox()[1]
+    c = c.crop((0, t, ancho, min(c.height, t + alto)))
+    _brillo(img, (cx - ancho * 0.62, ytop + alto * 0.05, cx + ancho * 0.62, ytop + alto * 0.95), AZUL, alpha=150, desenfoque=46)
+    m = Image.new("L", c.size, 255)
+    dm = ImageDraw.Draw(m)
+    for i in range(fundido):                                     # degradado de opacidad en el borde inferior
+        dm.line([(0, c.height - 1 - i), (c.width, c.height - 1 - i)], fill=int(255 * i / fundido))
+    c.putalpha(ImageChops.multiply(c.getchannel("A"), m))
+    img.paste(c, (cx - ancho // 2, int(ytop)), c)
+    return c.height
+
+
 def gol(datos):
     """«¡GOOOOOOL!» con quién marcó, el minuto y el marcador en ese momento. Solo para goles del Celta."""
     img = fondo_gol(); d = ImageDraw.Draw(img)
     foto = _foto_goleador(datos)                                  # v79: con foto del goleador, cabecera más compacta
-    y = SEGURA_SUP
+    y = SEGURA_SUP if foto is not None else SEGURA_SUP - 40        # v84: sin foto, el logo de la competición es más grande y sube para no dejar hueco encima
     logo = datos.get("logo")
     if logo in LOGOS:
-        tl = 72 if foto is not None else 112
+        tl = 60 if foto is not None else 190
         _logo_competicion(img, logo, W // 2, y, tl)
-        y += tl + (14 if foto is not None else 24)
+        y += tl + (12 if foto is not None else 14)
     # --- título
     titulo = datos.get("titulo") or "¡GOOOOOOL!"
-    f = fit(d, titulo, 168 if foto is not None else 200, W - 130, 90)
+    f = fit(d, titulo, 146 if foto is not None else 200, W - 130, 90)
     bb = d.textbbox((0, 0), titulo, font=f, stroke_width=10)
     cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))                  # resplandor azul detrás de las letras
     ImageDraw.Draw(cap).text((W / 2 - d.textlength(titulo, font=f) / 2, y - bb[1]), titulo, font=f, fill=AZUL + (255,), stroke_width=22, stroke_fill=AZUL + (255,))
@@ -1462,12 +1570,32 @@ def gol(datos):
     # --- quién y cuándo
     nom = (datos.get("goleador") or "").upper()
     apretado = foto is not None and (len(_nombre_lineas(d, nom, 104, W - 110)) > 1 or (datos.get("modo") or "").lower() in ("penalti", "propia"))
+    try:                                                          # v83: cuenta de Instagram del goleador (con o sin foto); no en propia puerta ni en tarjetas/penaltis parados
+        import caras
+        cuenta = None if ((datos.get("modo") or "").lower() == "propia" or datos.get("tipo") not in (None, "gol")) else caras.instagram_de(datos.get("goleador") or "")
+    except Exception:
+        cuenta = None
     if foto is not None:                                          # v79: con foto, el diseño se compacta (sin «en directo» y escudos más pequeños)
-        PR = 70 if apretado else 100
-        y = yl + 30
-        _cara_gol(img, foto, W // 2, y + PR, PR)
+        dos = len(_nombre_lineas(d, nom, 104, W - 110)) > 1           # v82: el tamaño de la cara se calcula con el hueco que queda (nombre en dos líneas, «de penalti»...)
+        B = 336 - (52 if (datos.get("modo") or "").lower() in ("penalti", "propia") else 0) - (80 if dos else 0)
+        k = max(0.70, min(1.30, (B - (44 if cuenta else 4)) / 280))
+        AN, FH, barbilla = int(356 * k), int(340 * k), int(282 * k)
+        y = yl + 14
+        _cara_grande(img, foto, W // 2, y, AN, FH, max(30, FH - barbilla))
+        globals()["USO_FOTOS"] = True
         d = ImageDraw.Draw(img)
-        y += 2 * PR + 26
+        if cuenta:                                                # «@cuenta» en una píldora oscura bajo la barbilla; Instagram pone encima la mención pulsable
+            arroba = "@" + cuenta
+            fa = fit(d, arroba, 38, W - 260, 24)
+            wa = d.textlength(arroba, font=fa)
+            yp = y + barbilla - 14
+            d.rounded_rectangle([W / 2 - wa / 2 - 26, yp, W / 2 + wa / 2 + 26, yp + 52], 26, fill=(4, 14, 34, 235), outline=AZUL, width=2)
+            ba = d.textbbox((0, 0), "@Ag", font=fa)
+            d.text((W / 2 - wa / 2, yp + 26 - (ba[1] + ba[3]) / 2), arroba, font=fa, fill=WHITE)
+            globals()["ULTIMA_ETIQUETA"] = (0.5, round((yp + 26) / H, 3))
+            y = yp + 52 + 8
+        else:
+            y = y + barbilla + 4
     else:
         y = yl + 40
     nom = (datos.get("goleador") or "").upper()
@@ -1480,25 +1608,41 @@ def gol(datos):
         bl = d.textbbox((0, 0), l, font=fl, stroke_width=7)
         _texto_borde(d, y - bl[1], l, fl, WHITE, borde=(4, 14, 34), grosor=7)
         y += int(tam * 1.06)
-    modo = {"penalti": "DE PENALTI", "propia": "EN PROPIA PUERTA"}.get((datos.get("modo") or "").lower())
+    modo = datos.get("etiqueta") or {"penalti": "DE PENALTI", "propia": "EN PROPIA PUERTA"}.get((datos.get("modo") or "").lower())     # v84: «etiqueta» para tarjetas y penaltis parados
     if modo:
-        center(d, y + 2, modo, font(36), fill=AZUL)
-        y += 52
+        grande = bool(datos.get("etiqueta"))                      # v84: en tarjetas y penaltis parados la etiqueta es más grande
+        center(d, y + 2, modo, fit(d, modo, 46 if grande else 36, W - 100, 22), fill=AZUL)
+        y += 62 if grande else 52
+    if cuenta and foto is None:                                   # v83: sin foto, «@cuenta» en una píldora bajo el nombre; Instagram pone encima la mención pulsable
+        arroba = "@" + cuenta
+        fa = fit(d, arroba, 38, W - 260, 24)
+        wa = d.textlength(arroba, font=fa)
+        yp = y + 4
+        d.rounded_rectangle([W / 2 - wa / 2 - 26, yp, W / 2 + wa / 2 + 26, yp + 52], 26, fill=(4, 14, 34, 235), outline=AZUL, width=2)
+        ba = d.textbbox((0, 0), "@Ag", font=fa)
+        d.text((W / 2 - wa / 2, yp + 26 - (ba[1] + ba[3]) / 2), arroba, font=fa, fill=WHITE)
+        globals()["ULTIMA_ETIQUETA"] = (0.5, round((yp + 26) / H, 3))
+        y = yp + 52
     y += 22
     mi = str(datos.get("minuto") or "").strip()
     if mi:
         fm = font(84)
         wm = d.textlength(mi, font=fm)
-        ancho = wm + 62 + 56 + 50
+        icono = datos.get("icono")                                # v84: tarjeta roja (una) o doble amarilla (amarilla + roja) en vez del balón
+        iw = 92 if icono == "doble" else 62
+        ancho = wm + iw + 56 + 50
         x0 = W / 2 - ancho / 2
         d.rounded_rectangle([x0, y, x0 + ancho, y + 112], 56, fill=AZUL)
-        _balon(d, int(x0 + 30 + 31), y + 56, 31)
+        if icono in ("roja", "doble"):
+            _tarjeta_icono(d, int(x0 + 30 + iw / 2), y + 56, 76, icono == "doble")
+        else:
+            _balon(d, int(x0 + 30 + 31), y + 56, 31)
         bm = d.textbbox((0, 0), "8", font=fm)
-        d.text((x0 + 30 + 62 + 22, y + 56 - (bm[1] + bm[3]) / 2), mi, font=fm, fill=NAVY)
+        d.text((x0 + 30 + iw + 22, y + 56 - (bm[1] + bm[3]) / 2), mi, font=fm, fill=NAVY)
         y += 112
     # --- marcador con los dos escudos
-    r = (62 if apretado else 80) if foto is not None else 98
-    cy = y + (36 if apretado else 52 if foto is not None else 70) + r
+    r = (58 if apretado else 68) if foto is not None else 98
+    cy = y + (30 if apretado else 38 if foto is not None else 70) + r
     local_marca = datos.get("lado") == "local"
     nlins = 1                                                     # líneas máximas de los nombres bajo los escudos (para colocar el crédito)
     for lado, x in (("local", 190), ("visitante", 890)):
@@ -1960,4 +2104,4 @@ def almanaque(datos):
     return img
 
 
-RENDER = {"gol": gol, "historia_portada": historia_portada, "almanaque": almanaque, "pronostico": pronostico, "efemeride": efemeride, "cumpleanos": cumpleanos, "entradas": entradas, "partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}
+RENDER = {"gol": gol, "tarjeta": gol, "penalti_parado": gol, "historia_portada": historia_portada, "almanaque": almanaque, "pronostico": pronostico, "efemeride": efemeride, "cumpleanos": cumpleanos, "entradas": entradas, "partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}

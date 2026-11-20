@@ -8,6 +8,9 @@ Escribe en datos_reales/ (o en la carpeta --salida):
   Solo el Celta (primer equipo):
     directo_celta_gol_NN.json        «¡GOOOOOOL!» por cada gol DEL CELTA: goleador, minuto y marcador en ese momento
                                      (NN = número de gol del partido). Los goles del rival no se publican.
+  v84, solo el Celta (primer equipo):
+    directo_celta_tarjeta_NN.json    «¡ROJA DIRECTA!» o «¡DOBLE AMARILLA!» (expulsión de un jugador del Celta o del rival)
+    directo_celta_penalti_NN.json    «¡PENALTI PARADO!» cuando el Celta detiene un penalti del rival
 El final lo saca resultados.py como siempre (también el del Fortuna).
 Si el equipo no está jugando, no escribe nada. Nunca rompe el programa: si ESPN falla, simplemente no hay directo.
 diario.py anota en estado/publicado.json lo ya publicado, así que repetir un gol en la siguiente revisión no lo duplica.
@@ -70,7 +73,8 @@ def de_espn_directo(ev, k):
     if re.search(r"HALFTIME", tipo.get("name", ""), re.I):
         minuto = "Descanso"
     return {"f": f, "k": k, "home": nm(h), "away": nm(a), "gl": gl, "gv": gv, "gol_l": g1, "gol_v": g2,
-            "id": ev.get("id") or c.get("id"), "minuto": minuto, "estado": tipo.get("name", ""), "periodo": st.get("period")}
+            "id": ev.get("id") or c.get("id"), "minuto": minuto, "estado": tipo.get("name", ""), "periodo": st.get("period"),
+            "detalles": c.get("details") or [], "home_id": str((h.get("team") or {}).get("id", "")), "away_id": str((a.get("team") or {}).get("id", ""))}
 
 
 def _ids(ev):
@@ -102,7 +106,7 @@ def buscar_en_vivo(registro=None):
                     if p and es_del_equipo(eq, p):
                         p["liga"] = liga
                         previo = vistos.get(p["id"])
-                        if not previo or (len(p["gol_l"]) + len(p["gol_v"]) > len(previo["gol_l"]) + len(previo["gol_v"])):
+                        if not previo or (len(p["gol_l"]) + len(p["gol_v"]), len(p["detalles"])) > (len(previo["gol_l"]) + len(previo["gol_v"]), len(previo["detalles"])):
                             vistos[p["id"]] = p                 # si sale en varias fuentes, nos quedamos con la que trae más goles detallados
         out[eq] = list(vistos.values())
     return out
@@ -205,6 +209,149 @@ def datos_gol(p, g):
     return d
 
 
+# ---------------------------------------------------------------- tarjetas rojas y penaltis parados (v84, solo el Celta)
+def _texto_ev(ev):
+    return " ".join(str(x) for x in ((ev.get("type") or {}).get("text"), ev.get("text"), ev.get("shortText")) if x)
+
+
+def _slug(t):
+    import unicodedata
+    return re.sub(r"[^a-z0-9]+", "-", unicodedata.normalize("NFKD", (t or "").lower()).encode("ascii", "ignore").decode()).strip("-")
+
+
+def _nombres_ev(ev):
+    out = []
+    for a in ev.get("athletesInvolved") or []:                  # formato del marcador (details)
+        n = a.get("displayName") or a.get("shortName")
+        if n:
+            out.append(n)
+    for pt in ev.get("participants") or []:                     # formato del detalle del partido (keyEvents)
+        n = (pt.get("athlete") or {}).get("displayName")
+        if n:
+            out.append(n)
+    return out
+
+
+def eventos_disciplina(items):
+    """Eventos de ESPN (competitions[0].details del marcador o keyEvents del detalle) -> expulsiones y penaltis parados, en orden:
+    [{'tipo': 'roja'|'doble'|'penalti_parado', 'jugador', 'portero', 'minuto', 'orden', 'equipo_id'}].
+    ESPN no documenta su formato, así que se mira todo a la vez (banderas redCard/yellowCard y el texto del evento).
+    Roja directa o doble amarilla: es doble si el texto lo dice, o si ese jugador ya tenía una amarilla antes en el partido (salvo que el texto diga «straight red»)."""
+    previos = []
+    for ev in items or []:
+        try:
+            if ev.get("shootout"):
+                continue
+            txt = _texto_ev(ev)
+            nombres = _nombres_ev(ev)
+            base = {"jugador": nombres[0] if nombres else "", "minuto": R._min((ev.get("clock") or {}).get("displayValue") or ""),
+                    "equipo_id": str((ev.get("team") or {}).get("id", "")), "portero": None}
+            base["orden"] = orden_minuto(base["minuto"]) if base["minuto"] else 999.0
+            segunda = bool(re.search(r"second yellow|2nd yellow|second bookable|segunda amarilla|yellow.{0,12}red", txt, re.I))
+            directa = bool(re.search(r"straight red|violent conduct|serious foul play|denying an obvious|roja directa", txt, re.I))
+            if ev.get("redCard") or re.search(r"\bred card\b|tarjeta roja|sent off|expulsad", txt, re.I):
+                previos.append(dict(base, tipo="roja", segunda=segunda, directa=directa))
+            elif ev.get("yellowCard") or re.search(r"yellow card|tarjeta amarilla", txt, re.I):
+                previos.append(dict(base, tipo="doble" if segunda else "amarilla", segunda=segunda, directa=False))
+            elif (re.search(r"penalty.{0,12}saved|saved.{0,25}penalty|penalti parado|penalty save", txt, re.I)
+                  or (ev.get("penaltyKick") and not ev.get("scoringPlay") and re.search(r"saved|parad|atajad", txt, re.I))):
+                m = re.search(r"(?:saved by|parado por|atajado por)\s+([^.,;()\n]+)", txt, re.I)
+                previos.append(dict(base, tipo="penalti_parado", portero=(m.group(1).strip() if m else None), segunda=False, directa=False,
+                                    otros=nombres[1:]))
+        except Exception:
+            continue
+    previos.sort(key=lambda e: e["orden"])
+    amarillas, out = {}, []
+    for e in previos:
+        clave = _slug(e["jugador"])
+        if e["tipo"] == "amarilla":
+            amarillas.setdefault(clave, []).append(e["orden"])
+            continue
+        if e["tipo"] in ("roja", "doble"):
+            if not e["jugador"]:
+                continue                                         # sin nombre no se publica (puede llegar en la siguiente revisión)
+            doble = e["tipo"] == "doble" or e["segunda"] or (not e["directa"] and any(o <= e["orden"] for o in amarillas.get(clave, [])))
+            ya = [x for x in out if x["tipo"] in ("roja", "doble") and _slug(x["jugador"]) == clave]
+            if ya:                                               # la misma expulsión contada dos veces (amarilla+roja, marcador+detalle)
+                if doble:
+                    ya[0]["tipo"] = "doble"
+                continue
+            out.append({k: e[k] for k in ("jugador", "minuto", "orden", "equipo_id", "portero")} | {"tipo": "doble" if doble else "roja"})
+        else:
+            if any(x["tipo"] == "penalti_parado" and abs(x["orden"] - e["orden"]) < 1 for x in out):
+                continue
+            out.append({k: e[k] for k in ("jugador", "minuto", "orden", "equipo_id", "portero")} | {"tipo": "penalti_parado", "otros": e.get("otros", [])})
+    return out
+
+
+def penalti_a_favor(e):
+    """Un penalti parado solo se publica si lo para el Celta (lo lanza el rival). Devuelve (a_favor, lanzador, portero)."""
+    try:
+        import caras
+        celta_id = str(R.CELTA_ESPN)
+        nombre = e["jugador"]
+        pos = (caras.posicion_de(nombre) or "") if nombre else ""
+        if pos:                                                   # el nombre es de un jugador del Celta: si es el portero, lo ha parado él; si no, el que lo lanza es del Celta
+            if re.search(r"porteir|portero", pos, re.I):
+                return True, None, nombre
+            return False, nombre, None
+        if e["equipo_id"] and e["equipo_id"] != celta_id:         # lo lanza un jugador del rival
+            portero = e.get("portero")
+            if not portero:
+                for o in e.get("otros") or []:
+                    if re.search(r"porteir|portero", caras.posicion_de(o) or "", re.I):
+                        portero = o
+            return True, nombre or None, portero
+    except Exception:
+        pass
+    return False, None, None
+
+
+def eventos_a_publicar(p, actual, sin_internet):
+    """Expulsiones (de cualquier equipo) y penaltis parados por el Celta del partido en juego, solo los recientes."""
+    items = list(p.get("detalles") or [])
+    if not sin_internet and p.get("liga") and p.get("id"):       # el detalle del partido (keyEvents) suele traer más datos que el marcador
+        try:
+            items += R.get(R.ESPN.format(p["liga"]) + f"summary?event={p['id']}").get("keyEvents") or []
+        except Exception as e:
+            print(f"aviso: sin detalle del partido para tarjetas/penaltis: {e}", file=sys.stderr)
+    out = []
+    for e in eventos_disciplina(items):
+        if actual is not None and e["orden"] < actual - MAX_ANTIGUEDAD:
+            continue
+        if e["tipo"] == "penalti_parado":
+            fav, lanzador, portero = penalti_a_favor(e)
+            if not fav:
+                continue
+            e = dict(e, jugador=lanzador or "", portero=portero)
+        out.append(e)
+    return out
+
+
+def _nombre_equipo(p, tid):
+    return R.nombre(p["home"]) if tid and tid == p.get("home_id") else R.nombre(p["away"]) if tid and tid == p.get("away_id") else ""
+
+
+def datos_evento(p, e, n):
+    celta_local = R.es_celta(p["home"]) and not R.es_fortuna(p["home"])
+    lado = "local" if celta_local else "visitante"
+    if e["tipo"] == "penalti_parado":
+        rival = R.nombre(p["away"] if celta_local else p["home"])
+        d = datos(p, "¡PENALTI PARADO!", con_minuto=False, eq="celta")
+        d.update(tipo="penalti_parado", goleador=(e.get("portero") or "¡NON PASA!"), minuto=e["minuto"], lado=lado,
+                 etiqueta=(f"Penalti de {e['jugador']} · {rival}" if e.get("jugador") else f"Penalti do {rival}"), portero=e.get("portero") or "", lanzador=e.get("jugador") or "", rival=rival)
+    else:
+        equipo = _nombre_equipo(p, e["equipo_id"])
+        del_celta = e["equipo_id"] == str(R.CELTA_ESPN)
+        d = datos(p, "¡DOBLE AMARILLA!" if e["tipo"] == "doble" else "¡ROJA DIRECTA!", con_minuto=False, eq="celta")
+        d.update(tipo="tarjeta", goleador=e["jugador"], minuto=e["minuto"], lado=lado, icono="doble" if e["tipo"] == "doble" else "roja",
+                 etiqueta=("EXPULSADO · " + equipo.upper()) if equipo else "EXPULSADO", equipo=equipo, de="celta" if del_celta else "rival", clase=e["tipo"])
+    d.update(goles_local=p["gl"], goles_visitante=p["gv"], _n=n)
+    d.pop("goleadores_local", None)
+    d.pop("goleadores_visitante", None)
+    return d
+
+
 def escribir(ruta, d):
     json.dump(d, open(ruta, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print("escrito", ruta)
@@ -226,6 +373,18 @@ def procesar(eq, p, salida, sin_internet):
     if eq == "celta" and p["gl"] + p["gv"] > 0:
         for g in goles_del_celta(p, 45 if descanso else m):
             escribir(os.path.join(salida, f"directo_celta_gol_{g['n']:02d}.json"), datos_gol(p, g))
+    if eq == "celta":                                              # v84: expulsiones y penaltis parados
+        try:
+            nt = npp = 0
+            for e in eventos_a_publicar(p, 45 if descanso else m, sin_internet):
+                if e["tipo"] == "penalti_parado":
+                    npp += 1
+                    escribir(os.path.join(salida, f"directo_celta_penalti_{npp:02d}.json"), datos_evento(p, e, npp))
+                else:
+                    nt += 1
+                    escribir(os.path.join(salida, f"directo_celta_tarjeta_{nt:02d}.json"), datos_evento(p, e, nt))
+        except Exception as e:
+            print(f"aviso: tarjetas/penaltis no disponibles ({e})", file=sys.stderr)
     if descanso:
         escribir(os.path.join(salida, f"directo_{eq}_descanso.json"), datos(p, "DESCANSO", con_minuto=False, eq=eq))
     elif p.get("periodo") == 2 and m and 46 <= m <= 60:           # se nos pasó el descanso (la revisión es cada pocos minutos): se reconstruye con los goles de la primera parte

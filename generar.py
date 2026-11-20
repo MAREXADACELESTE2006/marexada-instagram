@@ -280,6 +280,8 @@ def foto_especial(datos):
     · inicio de partido del Celta (primer equipo)                                                          -> fondo_inicio.jpg
     · resultado con victoria del Celta (primer equipo)                                                     -> fondo_victoria.jpg"""
     tipo, titulo = datos.get("tipo"), (datos.get("titulo") or "").upper()
+    if tipo in ("gol", "tarjeta", "penalti_parado"):                                           # v80: el gol en Europa League lleva el fondo y el estilo de Europa; el resto de goles, su fondo de siempre
+        return "fondo_europa.jpg" if (datos.get("logo") == "europa" or datos.get("competicion") == "europa") else None
     if tipo not in ("previa", "proximo", "convocatoria", "alineacion", "resultado"):
         return None
     if datos.get("logo") == "europa" or datos.get("competicion") == "europa":
@@ -305,6 +307,7 @@ def generar(ruta_json, salida=None):
     HISTORIA.usar_tema(datos.get("logo"), datos.get("tag"))
     HISTORIA._TIPO_FONDO = datos.get("tipo")
     HISTORIA._FOTO_ESPECIAL = foto_especial(datos)
+    HISTORIA.USO_FOTOS, HISTORIA.ULTIMA_ETIQUETA = False, None     # v80: se ponen a True/valor al dibujar caras (diario.py los lee para el crédito y la etiqueta)
     if datos["tipo"] in HISTORIA.RENDER:
         img = HISTORIA.RENDER[datos["tipo"]](datos)  # TODO sale como historia 1080x1920 (también Europa League)
         img = HISTORIA.acabado(img)                  # v60: halo de color, viñeteado y grano

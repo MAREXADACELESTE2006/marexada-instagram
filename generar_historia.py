@@ -1403,17 +1403,50 @@ def _brillo(img, caja, color, alpha=210, desenfoque=24):
     img.paste(cap, (0, 0), cap)
 
 
+def _foto_goleador(datos):
+    """v79: cara del goleador (assets/caras) o None. En un gol en propia puerta el goleador es del rival: nunca se pone foto."""
+    if (datos.get("modo") or "").lower() == "propia":
+        return None
+    try:
+        import caras
+        ruta = caras.buscar(datos.get("goleador") or "")
+        return Image.open(ruta).convert("RGBA") if ruta else None
+    except Exception:
+        return None
+
+
+def _cara_gol(img, cara, cx, cy, r):
+    """Cara recortada dentro de un círculo azul con aro blanco y un resplandor detrás."""
+    _brillo(img, (cx - r - 40, cy - r - 40, cx + r + 40, cy + r + 40), AZUL, alpha=120, desenfoque=26)
+    d = ImageDraw.Draw(img)
+    d.ellipse([cx - r - 6, cy - r - 6, cx + r + 6, cy + r + 6], fill=WHITE)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=AZUL)
+    ancho = int(2 * r * 1.12)
+    k = ancho / cara.width
+    cara = cara.resize((ancho, int(cara.height * k)), Image.LANCZOS)
+    arriba = cara.getchannel("A").getbbox()[1]
+    capa = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    capa.paste(cara, (cx - ancho // 2, cy - r + 8 - arriba), cara)
+    mascara = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(mascara).ellipse([cx - r, cy - r, cx + r, cy + r], fill=255)
+    from PIL import ImageChops
+    capa.putalpha(ImageChops.multiply(capa.getchannel("A"), mascara))
+    img.paste(capa, (0, 0), capa)
+
+
 def gol(datos):
     """«¡GOOOOOOL!» con quién marcó, el minuto y el marcador en ese momento. Solo para goles del Celta."""
     img = fondo_gol(); d = ImageDraw.Draw(img)
+    foto = _foto_goleador(datos)                                  # v79: con foto del goleador, cabecera más compacta
     y = SEGURA_SUP
     logo = datos.get("logo")
     if logo in LOGOS:
-        _logo_competicion(img, logo, W // 2, y, 112)
-        y += 112 + 24
+        tl = 72 if foto is not None else 112
+        _logo_competicion(img, logo, W // 2, y, tl)
+        y += tl + (14 if foto is not None else 24)
     # --- título
     titulo = datos.get("titulo") or "¡GOOOOOOL!"
-    f = fit(d, titulo, 200, W - 130, 90)
+    f = fit(d, titulo, 168 if foto is not None else 200, W - 130, 90)
     bb = d.textbbox((0, 0), titulo, font=f, stroke_width=10)
     cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))                  # resplandor azul detrás de las letras
     ImageDraw.Draw(cap).text((W / 2 - d.textlength(titulo, font=f) / 2, y - bb[1]), titulo, font=f, fill=AZUL + (255,), stroke_width=22, stroke_fill=AZUL + (255,))
@@ -1426,12 +1459,21 @@ def gol(datos):
     yl = y + 66
     _filete(d, yl)
     # --- quién y cuándo
-    y = yl + 40
+    nom = (datos.get("goleador") or "").upper()
+    apretado = foto is not None and (len(_nombre_lineas(d, nom, 104, W - 110)) > 1 or (datos.get("modo") or "").lower() in ("penalti", "propia"))
+    if foto is not None:                                          # v79: con foto, el diseño se compacta (sin «en directo» y escudos más pequeños)
+        PR = 70 if apretado else 100
+        y = yl + 30
+        _cara_gol(img, foto, W // 2, y + PR, PR)
+        d = ImageDraw.Draw(img)
+        y += 2 * PR + 26
+    else:
+        y = yl + 40
     nom = (datos.get("goleador") or "").upper()
     tam = 104
     lineas = _nombre_lineas(d, nom, tam, W - 110)
     if len(lineas) > 1:
-        tam = 92
+        tam = 76 if apretado else 92
     for l in lineas:
         fl = fit(d, l, tam, W - 90, 44)
         bl = d.textbbox((0, 0), l, font=fl, stroke_width=7)
@@ -1454,15 +1496,17 @@ def gol(datos):
         d.text((x0 + 30 + 62 + 22, y + 56 - (bm[1] + bm[3]) / 2), mi, font=fm, fill=NAVY)
         y += 112
     # --- marcador con los dos escudos
-    r = 98
-    cy = y + 70 + r
+    r = (62 if apretado else 80) if foto is not None else 98
+    cy = y + (36 if apretado else 52 if foto is not None else 70) + r
     local_marca = datos.get("lado") == "local"
+    nlins = 1                                                     # líneas máximas de los nombres bajo los escudos (para colocar el crédito)
     for lado, x in (("local", 190), ("visitante", 890)):
         if (lado == "local") == local_marca:
             _brillo(img, (x - r - 30, cy - r - 30, x + r + 30, cy + r + 30), AZUL, alpha=105, desenfoque=22)
         d = ImageDraw.Draw(img)
         _escudo_redondo(img, x, cy, datos[lado], siglas(nombre(datos, lado)), r=r)
         lins = _nombre_lineas(d, nombre(datos, lado), 34, 330)
+        nlins = max(nlins, len(lins))
         for i, l in enumerate(lins):
             _texto_borde(d, cy + r + 22 + i * 42, l, fit(d, l, 34, 330), WHITE, grosor=4, x=x)
     a, b = str(datos["goles_local"]), str(datos["goles_visitante"])
@@ -1481,16 +1525,19 @@ def gol(datos):
     _texto_borde(d, ty, a, fs, AZUL if local_marca else WHITE, grosor=8, x=x0 + wa / 2)
     d.rounded_rectangle([x0 + wa + hueco, cy - 8, x0 + wa + hueco + barra, cy + 8], 8, fill=AZUL)
     _texto_borde(d, ty, b, fs, WHITE if local_marca else AZUL, grosor=8, x=x0 + wa + 2 * hueco + barra + d.textlength(b, font=fs) / 2)
-    # --- «en directo»
-    yp = min(FIN_CONTENIDO - 76, cy + r + 22 + 2 * 42 + 40)
-    texto = "EN DIRECTO"
-    fd = font(36)
-    ancho = d.textlength(texto, font=fd) + 40 + 56
-    x0 = W / 2 - ancho / 2
-    _rgba(img, [x0, yp, x0 + ancho, yp + 76], 38, (4, 12, 30, 150), borde=(255, 255, 255, 90), grosor=2)
-    d = ImageDraw.Draw(img)
-    d.ellipse([x0 + 26, yp + 26, x0 + 50, yp + 50], fill=(238, 52, 52))
-    d.text((x0 + 70, yp + 38 - fd.size * 0.70), texto, font=fd, fill=WHITE)
+    if foto is None:
+        # --- «en directo»
+        yp = min(FIN_CONTENIDO - 76, cy + r + 22 + 2 * 42 + 40)
+        texto = "EN DIRECTO"
+        fd = font(36)
+        ancho = d.textlength(texto, font=fd) + 40 + 56
+        x0 = W / 2 - ancho / 2
+        _rgba(img, [x0, yp, x0 + ancho, yp + 76], 38, (4, 12, 30, 150), borde=(255, 255, 255, 90), grosor=2)
+        d = ImageDraw.Draw(img)
+        d.ellipse([x0 + 26, yp + 26, x0 + 50, yp + 50], fill=(238, 52, 52))
+        d.text((x0 + 70, yp + 38 - fd.size * 0.70), texto, font=fd, fill=WHITE)
+    else:                                                         # v79: crédito obligatorio de la foto
+        _credito_fotos(img, min(FIN_CONTENIDO - 40, cy + r + 22 + nlins * 42 + 12))
     _pie_v39(img, d)
     return img
 
@@ -1564,7 +1611,7 @@ def _componer(img, cap):
     img.paste(cap, (0, 0), cap)
 
 
-def _brillo(img, cx, cy, radio, alfa=170, color=CEL):
+def _brillo_suave(img, cx, cy, radio, alfa=170, color=CEL):
     """Resplandor suave y circular (se desvanece del todo antes de llegar al borde: sin cortes rectos)."""
     lado = 2 * radio
     m = Image.new("L", (lado, lado), 0)
@@ -1665,7 +1712,7 @@ def _fondo_almanaque(datos, yband=640, foco=(540, 760), radio=620, alfa=95):
         dd.line([(0, y), (W, y)], fill=(3, 10, 28, int(a)))
     _componer(img, cap)
     if foco:
-        _brillo(img, foco[0], foco[1], radio, max(40, alfa - 40))
+        _brillo_suave(img, foco[0], foco[1], radio, max(40, alfa - 40))
     d = ImageDraw.Draw(img)
     d.rectangle([40, 40, W - 40, H - 40], outline=CEL, width=2)
     L = 54                                                                # esquinas dobles
@@ -1709,7 +1756,7 @@ def _sello_anos(img, y, anos):
     bn = d.textbbox((0, 0), num, font=fn)
     h_n = bn[3] - bn[1]
     cy = y + h_n / 2
-    _brillo(img, W // 2, int(cy), 330, 120)
+    _brillo_suave(img, W // 2, int(cy), 330, 120)
     d = ImageDraw.Draw(img)
     d.text((x0 + w_hai + gap + 3, y - bn[1] + 5), num, font=fn, fill=(2, 8, 22))               # sombra
     d.text((x0 + w_hai + gap, y - bn[1]), num, font=fn, fill=WHITE)
@@ -1761,7 +1808,7 @@ def _barras(img, actual, total, y=1432):
 
 
 def _escudo_aro(img, cx, cy, slug, sig, r):
-    _brillo(img, cx, cy, int(r * 2.1), 150)
+    _brillo_suave(img, cx, cy, int(r * 2.1), 150)
     escudo_mini(img, cx, cy, slug, sig, r=r)
     d = ImageDraw.Draw(img)
     d.ellipse([cx - r - 11, cy - r - 11, cx + r + 11, cy + r + 11], outline=CEL, width=4)

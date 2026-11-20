@@ -13,6 +13,7 @@ Uso:
     python diario.py --offline --hoy 2026-11-08      (prueba sin internet con los datos de ejemplo de fixtures/)
 Opciones: --forzar (ignora lo ya generado), --sin-estado (no actualiza estado/publicado.json), --sin-telegram.
 """
+import caras
 import argparse
 import datetime
 import json
@@ -403,7 +404,8 @@ def plan(hoy, datos, avisos):
         quien = re.sub(r"[^a-z0-9]+", "-", unicodedata.normalize("NFKD", g["goleador"]).encode("ascii", "ignore").decode().lower()).strip("-")
         extra = {"penalti": " (de penalti)", "propia": " (en propia porta)"}.get(g.get("modo"), "")
         add(f"gol-celta-{g['_fecha']}-{g['_id']}-{g['_n']}-{g['goles_local']}-{g['goles_visitante']}-{quien}", fichero, "resultado", "xusto agora (en directo)",
-            f"GOOOOOOL! ⚽ {g['goleador']}{extra} ({g['minuto']}). {nombre_lado(g, 'local')} {g['goles_local']} - {g['goles_visitante']} {nombre_lado(g, 'visitante')}. Forza Celta! 💙 {HASHTAGS}")
+            f"GOOOOOOL! ⚽ {g['goleador']}{extra} ({g['minuto']}). {nombre_lado(g, 'local')} {g['goles_local']} - {g['goles_visitante']} {nombre_lado(g, 'visitante')}. Forza Celta! 💙 {HASHTAGS}"
+            + (" 📸 Fotos: Web oficial del RC Celta (@rccelta)" if g.get("modo") != "propia" and caras.buscar(g["goleador"]) else ""))      # v79: crédito cuando sale la cara del goleador
 
     tabla = {0: ("clasificacion_celta_laliga.json", "laliga", "LaLiga"), 1: ("clasificacion_celta_fortuna.json", "fortuna", "LaLiga Hypermotion (Celta Fortuna)"),
              3: ("clasificacion_as_celtas_fem.json", "as-celtas-fem", "Segunda Federación Femenina (AS Celtas)")}.get(wd)

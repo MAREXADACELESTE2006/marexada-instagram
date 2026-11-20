@@ -1345,7 +1345,8 @@ def previa(datos):
 def fondo_gol():
     """Foto de la grada celebrando (assets/fondos/fondo_gol.jpg) SIN deformarla: una capa de fondo desenfocada y teñida de azul,
     y encima la foto nítida arriba, que se funde con el azul hacia abajo."""
-    foto = Image.open(os.path.join(ASSETS, "fondos", "fondo_gol.jpg")).convert("RGB")
+    nombre = _FOTO_ESPECIAL if _FOTO_ESPECIAL and os.path.isfile(os.path.join(ASSETS, "fondos", _FOTO_ESPECIAL)) else "fondo_gol.jpg"   # v80: en Europa League, el fondo de Europa
+    foto = Image.open(os.path.join(ASSETS, "fondos", nombre)).convert("RGB")
 
     def cubrir(w, h, cx=0.46):
         k = max(w / foto.width, h / foto.height)

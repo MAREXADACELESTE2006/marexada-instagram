@@ -608,30 +608,41 @@ def _alineacion_posiciones(datos, s):
     """v85: el once por líneas (portero, defensas, centrocampistas, dianteiros), cada jugador con su cara (o su dorsal si no hay foto)."""
     import caras
     img = fondo(); d = ImageDraw.Draw(img)
-    yl = _cab_texto(img, d, "ALIÑACIÓN", _tag_v33(datos))
-    sh = s * 0.72                                                 # cabecera más baja que en la lista: las caras necesitan sitio
-    r0 = int(98 * sh)
-    yp = _bloque_centro_logo(img, d, datos, yl + r0 + 30, r0, int(36 * sh), sh) + int(14 * sh)
-    linea = _fecha_linea(datos)
+    # cabecera COMPACTA (v85): título más pequeño y una sola fila de escudos y logo, para dejar sitio a las caras
+    yt = SEGURA_SUP
+    center(d, yt, "ALIÑACIÓN", fit(d, "ALIÑACIÓN", 76, W - 90))
+    center(d, yt + 86, _tag_v33(datos), font(28), fill=AZUL)
+    yl = yt + 140
+    _filete(d, yl)
+    re_ = 50
+    cy_ = yl + 30 + re_
+    for lado, x in (("local", 215), ("visitante", 865)):
+        _escudo_redondo(img, x, cy_, datos[lado], siglas(nombre(datos, lado)), r=re_)
+        center(d, cy_ + re_ + 10, nombre(datos, lado), fit(d, nombre(datos, lado), 26, 380), x=x)
+    if datos.get("logo") in LOGOS:
+        L = 100
+        _logo_competicion(img, datos["logo"], W // 2, cy_ - L // 2, L)
+    else:
+        center(d, cy_ - 30, "VS", font(52), fill=AZUL)
+    yp = cy_ + re_ + 10 + 34 + 10
+    linea = " · ".join(x for x in (_fecha_linea(datos), datos.get("lugar")) if x)
     if linea:
-        yp = _pildora_fecha(img, d, yp, linea, sub=datos.get("lugar"))
+        yp = _pildora_fecha(img, d, yp, linea, tam=34, alto=58)
     grupos = [g for g in datos["grupos"] if g.get("jugadores")]
-    sup = [j["nombre"] for j in datos.get("suplentes", []) if j.get("nombre")]
+    sup = [] if datos.get("sin_suplentes") else [j["nombre"] for j in datos.get("suplentes", []) if j.get("nombre")]
     f_sup = font_m(26)
     lin_sup = _lineas(d, "  ·  ".join(sup), f_sup, W - 140, maximo=2) if sup else []
     alto_sup = (46 + len(lin_sup) * 34 + 16) if lin_sup else 0
-    y0 = yp + 24
+    y0 = yp + 22
     libre = FIN_CONTENIDO - y0 - alto_sup - 20
     por_fila = libre / max(len(grupos), 1)
-    TIT, NOM, GAP = 34, 44, 6                                    # rótulo de la línea, nombre, aire entre líneas
-    r = int(max(34, min(92, (por_fila - TIT - NOM - GAP) / 2)))
+    TIT, NOM, GAP = 8, 42, 12                                    # aire arriba, nombre, aire entre líneas (v85: sin rótulos de línea)
+    r = int(max(34, min(100, (por_fila - TIT - NOM - GAP) / 2)))
     alto_fila = TIT + 2 * r + NOM + GAP
     _rgba(img, [40, y0 - 10, W - 40, y0 - 10 + alto_fila * len(grupos) + 12], 30, (4, 12, 30, 105))
     usa_fotos = False
     for gi, g in enumerate(grupos):
         yf = y0 + gi * alto_fila
-        f_t = font(24)
-        center(d, yf, g["titulo"], f_t, fill=AZUL)
         js = g["jugadores"]
         ancho = (W - 100) / max(len(js), 5)                                   # hueco de cada jugador (el de las filas de 5 manda; las cortas se centran)
         x_ini = W / 2 - ancho * len(js) / 2

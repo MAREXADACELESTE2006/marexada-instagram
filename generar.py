@@ -278,7 +278,8 @@ def foto_especial(datos):
     """v64: fotos propias para tres casos (el resto de historias no cambia):
     · partido de Europa League (previa, próximo partido, convocatoria, alineación, inicio, descanso y resultado) -> fondo_europa.jpg
     · inicio de partido del Celta (primer equipo)                                                          -> fondo_inicio.jpg
-    · resultado con victoria del Celta (primer equipo)                                                     -> fondo_victoria.jpg"""
+    · resultado con victoria del Celta (primer equipo)                                                     -> fondo_victoria.jpg
+    · alineación del Celta (v85; salvo Europa League, que lleva el suyo)                                   -> fondo_alineacion_balaidos.jpg"""
     tipo, titulo = datos.get("tipo"), (datos.get("titulo") or "").upper()
     if tipo in ("gol", "tarjeta", "penalti_parado"):                                           # v80: el gol en Europa League lleva el fondo y el estilo de Europa; el resto de goles, su fondo de siempre
         return "fondo_europa.jpg" if (datos.get("logo") == "europa" or datos.get("competicion") == "europa") else None
@@ -286,6 +287,8 @@ def foto_especial(datos):
         return None
     if datos.get("logo") == "europa" or datos.get("competicion") == "europa":
         return "fondo_europa.jpg"
+    if tipo == "alineacion":                                                                    # v85: la alineación del Celta lleva la foto de Balaídos
+        return "fondo_alineacion_balaidos.jpg"
     if "celta-vigo" not in (datos.get("local"), datos.get("visitante")) or datos.get("tag") == "CELTA FORTUNA":
         return None
     if tipo == "resultado" and titulo.startswith("COMIENZA"):

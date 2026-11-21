@@ -131,5 +131,26 @@
   "id": "17913726777657921",
   "creada": "2026-11-21T21:10:47.036328+01:00",
   "publicada": "2026-11-21T21:10:58.435069+01:00"
+ },
+ {
+  "clave": "gol-celta-2026-11-21-401882798-1-0-1-pablo-duran",
+  "nombre": "gol-celta-2026-11-21-401882798-1-0-1-pablo-duran-1795292157.jpg",
+  "sha": "7c049a307d6c53cce08b814d5d932fd2f5ce87ed",
+  "url": "https://raw.githubusercontent.com/MAREXADACELESTE2006/marexada-instagram/imagenes/historias/gol-celta-2026-11-21-401882798-1-0-1-pablo-duran-1795292157.jpg",
+  "texto": "GOOOOOOL! ⚽ Pablo Durán @pabloduraan_ (6'). Real Madrid 0 - 1 Celta. Forza Celta! 💙 #RCCelta #Celta #MarexadaCeleste",
+  "desde": "2026-11-21T21:15:57.056186+01:00",
+  "hasta": "2026-11-21T22:00:57.056186+01:00",
+  "estado": "pendiente",
+  "intentos": 1,
+  "id": null,
+  "creada": "2026-11-21T21:15:58.764126+01:00",
+  "etiquetas": [
+   {
+    "username": "pabloduraan_",
+    "x": 0.5,
+    "y": 0.426
+   }
+  ],
+  "ultimo_error": "'dict' object has no attribute 'lstrip'"
  }
 ]

@@ -140,8 +140,8 @@
   "texto": "GOOOOOOL! ⚽ Pablo Durán @pabloduraan_ (6'). Real Madrid 0 - 1 Celta. Forza Celta! 💙 #RCCelta #Celta #MarexadaCeleste",
   "desde": "2026-11-21T21:15:57.056186+01:00",
   "hasta": "2026-11-21T22:00:57.056186+01:00",
-  "estado": "pendiente",
-  "intentos": 2,
+  "estado": "fallida",
+  "intentos": 3,
   "id": null,
   "creada": "2026-11-21T21:15:58.764126+01:00",
   "etiquetas": [

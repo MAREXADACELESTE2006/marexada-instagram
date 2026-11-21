@@ -341,7 +341,7 @@ def plan(hoy, datos, avisos):
     if pr and pr.get("_fecha"):
         loc, vis = nombre_lado(pr, "local"), nombre_lado(pr, "visitante")
         add(f"pronostico-{pr['_fecha']}", "pronostico_celta.json", "mañana", "10:00",
-            f"🔮 PRONÓSTICO DA PEÑA: {loc} - {vis} ({pr['fecha_hora']}). Cal será o resultado? Responde coa túa aposta: "
+            f"🔮 PRONÓSTICO DA PEÑA: {loc} - {vis} ({pr['fecha_hora']}). Cal será o resultado? Vota na enquisa (pegatina de ligazón no oco de abaixo): "
             f"1 ({loc}) · X (empate) · 2 ({vis}) 💙 {etiquetas('celta')}")
 
     for i in (1, 2, 3):                                           # v67: miércoles, Almanaque Celta: gancho, datos y cierre (a las 19:00, 19:02 y 19:04)

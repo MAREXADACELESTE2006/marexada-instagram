@@ -153,9 +153,8 @@ def pie(img, d):
     _pie_marca(img, d, 1590)
 
 
-def escudo(img, cx, cy, slug, siglas):
-    """Círculo blanco de 310 px con sombra y el escudo dentro (o las siglas si no hay)."""
-    r = 155
+def escudo(img, cx, cy, slug, siglas, r=155):
+    """Círculo blanco de 310 px (r=155; v85: radio opcional) con sombra y el escudo dentro (o las siglas si no hay)."""
     sombra = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     ImageDraw.Draw(sombra).ellipse([cx - r + 4, cy - r + 14, cx + r + 4, cy + r + 14], fill=(0, 0, 0, 90))
     sombra = sombra.crop((cx - 200, cy - 200, cx + 220, cy + 220)).filter(ImageFilter.GaussianBlur(10))
@@ -166,13 +165,13 @@ def escudo(img, cx, cy, slug, siglas):
         d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=WHITE)
         c = Image.open(m[0]).convert("RGBA")
         c = c.crop(c.getbbox())
-        box = 214
+        box = 214 * r / 155
         k = min(box / c.width, box / c.height)
         c = c.resize((max(1, int(c.width * k)), max(1, int(c.height * k))), Image.LANCZOS)
         img.paste(c, (cx - c.width // 2, cy - c.height // 2), c)
     else:
         d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=AZUL)
-        center(d, cy - 50, siglas, font(100), fill=(14, 40, 84), x=cx)
+        center(d, cy - int(50 * r / 155), siglas, font(int(100 * r / 155)), fill=(14, 40, 84), x=cx)
 
 
 def siglas(txt):
@@ -1098,37 +1097,32 @@ def pronostico(datos):
     global AZUL, NAVY
     AZUL, NAVY = VERDE, VERDE_OSCURO                              # acento menta en todo el diseño (escudos sin imagen, pie...)
     img = fondo_verde(); d = ImageDraw.Draw(img)
-    center(d, 125, etiqueta_equipo(datos), font(42), fill=VERDE)
-    center(d, 175, "PRONÓSTICO", fit(d, "PRONÓSTICO", 128, W - 90))
-    center(d, 322, "DA PEÑA", font(76), fill=VERDE)
+    # v85: diseño más compacto; abajo queda un HUECO LIBRE (aprox. y 1170-1580) para la pegatina de enlace de la encuesta de Google
+    center(d, 100, etiqueta_equipo(datos), font(40), fill=VERDE)
+    center(d, 145, "PRONÓSTICO", fit(d, "PRONÓSTICO", 120, W - 90))
+    center(d, 282, "DA PEÑA", font(70), fill=VERDE)
     comp = {"copa": "Copa do Rei", "europa": "UEFA Europa League", "laliga": "LaLiga EA Sports", "hypermotion": "LaLiga Hypermotion"}.get(datos.get("logo"))
     j = (datos.get("jornada") or "").strip()
     texto_comp = j if (j and not re.search(r"\bX$", j)) else comp
     if texto_comp:
-        center(d, 432, texto_comp, fit(d, texto_comp, 40, W - 120), fill=(214, 240, 226))
-    cy = 705
-    escudo(img, 215, cy, datos.get("local"), siglas(nombre(datos, "local")))
-    escudo(img, 865, cy, datos.get("visitante"), siglas(nombre(datos, "visitante")))
-    center(d, cy - 43, "VS", font(80), fill=VERDE)
-    nombres_bajo_escudos(d, datos, y=cy + 190)
+        center(d, 378, texto_comp, fit(d, texto_comp, 36, W - 120), fill=(214, 240, 226))
+    cy, re_ = 585, 125
+    escudo(img, 215, cy, datos.get("local"), siglas(nombre(datos, "local")), r=re_)
+    escudo(img, 865, cy, datos.get("visitante"), siglas(nombre(datos, "visitante")), r=re_)
+    center(d, cy - 36, "VS", font(64), fill=VERDE)
+    nombres_bajo_escudos(d, datos, y=cy + re_ + 18)
     dia, hora = fecha_larga(datos.get("fecha_hora"))
     if dia:                                                       # píldora menta con el día y la hora
         cad = f"{dia} · {hora} h" if hora else dia
         f = fit(d, cad, 46, W - 200, 28)
         tw = d.textlength(cad, font=f)
-        d.rounded_rectangle([W // 2 - tw / 2 - 40, 1038, W // 2 + tw / 2 + 40, 1112], 37, fill=VERDE)
-        d.text((W // 2 - tw / 2, 1046), cad, font=f, fill=VERDE_OSCURO)
-    center(d, 1158, "Cal será o resultado?", fit(d, "Cal será o resultado?", 62, W - 100, 36))
-    etiquetas_1x2 = (("1", _corto(datos, "local")), ("X", "Empate"), ("2", _corto(datos, "visitante")))
-    for (letra, txt), cx in zip(etiquetas_1x2, (215, 540, 865)):
-        cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        ImageDraw.Draw(cap).ellipse([cx - 62, 1290, cx + 62, 1414], fill=(4, 30, 20, 190))
-        img.paste(cap, (0, 0), cap)
-        d = ImageDraw.Draw(img)
-        d.ellipse([cx - 62, 1290, cx + 62, 1414], outline=VERDE, width=6)
-        center(d, 1318, letra, font(70), x=cx)
-        center(d, 1424, txt, fit(d, txt, 28, 300, 18), fill=(214, 240, 226), x=cx)
-    center(d, 1488, "Responde co teu pronóstico!", fit(d, "Responde co teu pronóstico!", 40, W - 120, 26), fill=VERDE)
+        d.rounded_rectangle([W // 2 - tw / 2 - 40, 880, W // 2 + tw / 2 + 40, 954], 37, fill=VERDE)
+        d.text((W // 2 - tw / 2, 888), cad, font=f, fill=VERDE_OSCURO)
+    center(d, 990, "Cal será o resultado?", fit(d, "Cal será o resultado?", 58, W - 100, 36))
+    center(d, 1066, "Vota na enquisa!", fit(d, "Vota na enquisa!", 42, W - 120, 26), fill=VERDE)
+    for k in range(3):                                            # tres flechitas hacia el hueco de la pegatina
+        yy = 1132 + k * 14
+        d.line([(W // 2 - 26, yy), (W // 2, yy + 16), (W // 2 + 26, yy)], fill=VERDE, width=6, joint="curve")
     pie(img, d)
     return img
 

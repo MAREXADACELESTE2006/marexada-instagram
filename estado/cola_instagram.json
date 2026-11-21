@@ -50,5 +50,44 @@
   "intentos": 0,
   "id": null,
   "creada": "2026-11-20T15:52:56.257560+01:00"
+ },
+ {
+  "clave": "proximo-celta-hoxe-Sáb 21/11 · 21:00",
+  "nombre": "proximo-celta-hoxe-s-b-21-11-21-00-1795231241.jpg",
+  "sha": "1e885e533fec38e4a54876e7eabcffe435849082",
+  "url": "https://raw.githubusercontent.com/MAREXADACELESTE2006/marexada-instagram/imagenes/historias/proximo-celta-hoxe-s-b-21-11-21-00-1795231241.jpg",
+  "texto": "Hoxe xogamos! Real Madrid - Celta, Sáb 21/11 · 21:00. Forza! 💙 #RCCelta #Celta #MarexadaCeleste",
+  "desde": "2026-11-21T10:00:00+01:00",
+  "hasta": "2026-11-21T23:59:00+01:00",
+  "estado": "pendiente",
+  "intentos": 0,
+  "id": null,
+  "creada": "2026-11-21T04:20:43.752604+01:00"
+ },
+ {
+  "clave": "proximo-fortuna-Dom 22/11 · 18:30",
+  "nombre": "proximo-fortuna-dom-22-11-18-30-1795231243.jpg",
+  "sha": "9943ba4985cd3bd385ae63837686147a3cf09534",
+  "url": "https://raw.githubusercontent.com/MAREXADACELESTE2006/marexada-instagram/imagenes/historias/proximo-fortuna-dom-22-11-18-30-1795231243.jpg",
+  "texto": "Mañá xogamos! RC Celta Fortuna - Real Valladolid, Dom 22/11 · 18:30. Forza! 💙 #RCCelta #Celta #MarexadaCeleste",
+  "desde": "2026-11-21T10:00:00+01:00",
+  "hasta": "2026-11-21T23:59:00+01:00",
+  "estado": "pendiente",
+  "intentos": 0,
+  "id": null,
+  "creada": "2026-11-21T04:20:45.291366+01:00"
+ },
+ {
+  "clave": "proximo-as-celtas-fem-Dom 22/11 · 12:00",
+  "nombre": "proximo-as-celtas-fem-dom-22-11-12-00-1795231245.jpg",
+  "sha": "b27e174610b51cd987c1b2b3bbfe61c5e27ece9b",
+  "url": "https://raw.githubusercontent.com/MAREXADACELESTE2006/marexada-instagram/imagenes/historias/proximo-as-celtas-fem-dom-22-11-12-00-1795231245.jpg",
+  "texto": "Mañá xogamos! Racing - AS Celtas, Dom 22/11 · 12:00. Forza! 💙 #ASCeltas #MarexadaCeleste",
+  "desde": "2026-11-21T10:00:00+01:00",
+  "hasta": "2026-11-21T23:59:00+01:00",
+  "estado": "pendiente",
+  "intentos": 0,
+  "id": null,
+  "creada": "2026-11-21T04:20:46.772599+01:00"
  }
 ]

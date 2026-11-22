@@ -151,10 +151,11 @@
   "texto": "Hoxe xogamos! RC Celta Fortuna - Real Valladolid, Dom 22/11 · 18:30. Forza! 💙 #RCCelta #Celta #MarexadaCeleste",
   "desde": "2026-11-22T10:00:00+01:00",
   "hasta": "2026-11-22T23:59:00+01:00",
-  "estado": "pendiente",
+  "estado": "publicada",
   "intentos": 0,
-  "id": null,
-  "creada": "2026-11-22T03:27:47.243811+01:00"
+  "id": "18090086597303819",
+  "creada": "2026-11-22T03:27:47.243811+01:00",
+  "publicada": "2026-11-22T10:01:45.438590+01:00"
  },
  {
   "clave": "proximo-as-celtas-fem-hoxe-Dom 22/11 · 12:00",
@@ -164,9 +165,10 @@
   "texto": "Hoxe xogamos! Racing - AS Celtas, Dom 22/11 · 12:00. Forza! 💙 #ASCeltas #MarexadaCeleste",
   "desde": "2026-11-22T10:00:00+01:00",
   "hasta": "2026-11-22T23:59:00+01:00",
-  "estado": "pendiente",
+  "estado": "publicada",
   "intentos": 0,
-  "id": null,
-  "creada": "2026-11-22T03:27:48.888224+01:00"
+  "id": "18133048567693821",
+  "creada": "2026-11-22T03:27:48.888224+01:00",
+  "publicada": "2026-11-22T10:01:53.694275+01:00"
  }
 ]

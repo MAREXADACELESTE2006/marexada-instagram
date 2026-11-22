@@ -40,7 +40,7 @@ MIN_RAPIDO = {"rccelta.es": float(os.environ.get("MIN_RCCELTA", "60")),         
               "futbolme.com": float(os.environ.get("MIN_FUTBOLME", "10"))}
 AGENDA = os.path.join(BASE, "estado", "agenda.json")           # fechas de los partidos cercanos (la usa el modo rápido para saber si hay algo que vigilar)
 RAPIDAS = {"calendario.py", "noticias.py", "resultados.py", "futbolme.py", "besoccer.py", "directo.py", "alineacion.py"}     # fuentes del modo rápido: convocatorias y resultados
-CLAVES_RAPIDAS = ("convocatoria-", "cronica-", "resultado-", "inicio-", "descanso-", "gol-", "alineacion-")
+CLAVES_RAPIDAS = ("convocatoria-", "cronica-", "resultado-", "inicio-", "descanso-", "gol-", "alineacion-", "tarjeta-", "penalti-parado-")
 HASHTAGS = "#RCCelta #Celta #MarexadaCeleste"
 
 RECORDATORIOS = {
@@ -73,7 +73,7 @@ def cargar(ruta):
         return None
 
 
-CREDITO_FOTOS = "📸 Fotos: Web oficial del RC Celta (@rccelta)"
+CREDITO_FOTOS = "📸 Fotos: Web oficial do RC Celta (@rccelta)"
 
 
 def retocar_tras_generar(h):
@@ -402,10 +402,11 @@ def plan(hoy, datos, avisos):
         add(f"resultado-{nombre}-{r['fecha_hora']}-{r['goles_local']}-{r['goles_visitante']}" + ("-g" if con_gol else ""), fichero, "resultado", "xusto ao rematar o partido",
             f"Final: {nombre_lado(r, 'local')} {r['goles_local']} - {r['goles_visitante']} {nombre_lado(r, 'visitante')}. {cierre} 💙 {etiquetas(nombre)}{aviso_gol}")
 
-    al = datos.get("alineacion_celta.json")                          # v85: once del Celta antes del partido (ESPN), por posiciones y con caras
-    if al and al.get("grupos") and al.get("_fecha") == hoy.isoformat():
-        add(f"alineacion-celta-{al['_fecha']}-{al['_id']}", "alineacion_celta.json", "resultado", "xusto agora (antes do partido)",
-            f"Aliñación! 📋 O once do Celta para o partido: {nombre_lado(al, 'local')} - {nombre_lado(al, 'visitante')}. Forza Celta! 💙 {HASHTAGS}")
+    for eq_al, quien_al in (("celta", "Celta"), ("fortuna", "Celta Fortuna")):        # v85/v86: once antes del partido (ESPN), por posiciones y con caras
+        al = datos.get(f"alineacion_{eq_al}.json")
+        if al and al.get("grupos") and al.get("_fecha") == hoy.isoformat():
+            add(f"alineacion-{eq_al}-{al['_fecha']}-{al['_id']}", f"alineacion_{eq_al}.json", "resultado", "xusto agora (antes do partido)",
+                f"Aliñación! 📋 O once do {quien_al} para o partido: {nombre_lado(al, 'local')} - {nombre_lado(al, 'visitante')}. Forza {quien_al}! 💙 {HASHTAGS}")
     for nombre, quien in (("celta", "Celta"), ("fortuna", "Celta Fortuna")):          # v53: directo del Celta y del Celta Fortuna: inicio y descanso
         dv = datos.get(f"directo_{nombre}_inicio.json")
         if dv:
@@ -415,41 +416,38 @@ def plan(hoy, datos, avisos):
         if dd:
             add(f"descanso-{nombre}-{dd['_fecha']}-{dd['_id']}", f"directo_{nombre}_descanso.json", "resultado", "no descanso",
                 f"Descanso! {nombre_lado(dd, 'local')} {dd['goles_local']} - {dd['goles_visitante']} {nombre_lado(dd, 'visitante')}. Forza {quien}! 💙 {HASHTAGS}")
-    for fichero in sorted(f for f in datos if re.fullmatch(r"directo_celta_gol_\d+\.json", f)):         # v53: un «¡GOOOOOOL!» por cada gol del Celta (los del rival no se publican)
-        g = datos[fichero]
-        if not g or not g.get("goleador"):
-            continue
-        quien = re.sub(r"[^a-z0-9]+", "-", unicodedata.normalize("NFKD", g["goleador"]).encode("ascii", "ignore").decode().lower()).strip("-")
-        extra = {"penalti": " (de penalti)", "propia": " (en propia porta)"}.get(g.get("modo"), "")
-        cuenta = None if g.get("modo") == "propia" else caras.instagram_de(g["goleador"])          # v80: mención real al goleador (solo si es del Celta y sabemos su cuenta)
-        mencion = f" @{cuenta}" if cuenta else ""
-        add(f"gol-celta-{g['_fecha']}-{g['_id']}-{g['_n']}-{g['goles_local']}-{g['goles_visitante']}-{quien}", fichero, "resultado", "xusto agora (en directo)",
-            f"GOOOOOOL! ⚽ {g['goleador']}{mencion}{extra} ({g['minuto']}). {nombre_lado(g, 'local')} {g['goles_local']} - {g['goles_visitante']} {nombre_lado(g, 'visitante')}. Forza Celta! 💙 {HASHTAGS}"
-)
-        if cuenta:
-            out[-1]["etiquetas"] = [cuenta]
-    # v84: expulsiones (roja directa / doble amarilla, de cualquier equipo) y penaltis que para el Celta, en directo
-    for fichero in sorted(f for f in datos if re.fullmatch(r"directo_celta_tarjeta_\d+\.json", f)):
-        t = datos[fichero]
-        if not t or not t.get("goleador"):
-            continue
-        quien = re.sub(r"[^a-z0-9]+", "-", unicodedata.normalize("NFKD", t["goleador"]).encode("ascii", "ignore").decode().lower()).strip("-")
-        marcador = f"{nombre_lado(t, 'local')} {t['goles_local']} - {t['goles_visitante']} {nombre_lado(t, 'visitante')}"
-        donde = f" ({t['equipo']})" if t.get("equipo") else ""
-        if t.get("clase") == "doble":
-            texto = f"🟨🟥 Dobre amarela e expulsión de {t['goleador']}{donde} no minuto {t['minuto'].rstrip(chr(39))}. {marcador}. {HASHTAGS}"
-        else:
-            texto = f"🟥 Tarxeta vermella directa para {t['goleador']}{donde} no minuto {t['minuto'].rstrip(chr(39))}. {marcador}. {HASHTAGS}"
-        add(f"tarjeta-celta-{t['_fecha']}-{t['_id']}-{quien}-{t.get('clase', 'roja')}", fichero, "resultado", "xusto agora (en directo)", texto)
-    for fichero in sorted(f for f in datos if re.fullmatch(r"directo_celta_penalti_\d+\.json", f)):
-        t = datos[fichero]
-        if not t or not t.get("minuto"):
-            continue
-        marcador = f"{nombre_lado(t, 'local')} {t['goles_local']} - {t['goles_visitante']} {nombre_lado(t, 'visitante')}"
-        quien_para = f"{t['portero']} detén" if t.get("portero") else "O Celta detén"
-        de_quen = f" o penalti de {t['lanzador']} ({t['rival']})" if t.get("lanzador") else " un penalti"
-        add(f"penalti-parado-{t['_fecha']}-{t['_id']}-{re.sub(r'[^0-9]+', '', t['minuto'])}", fichero, "resultado", "xusto agora (en directo)",
-            f"🧤 PENALTI PARADO! {quien_para}{de_quen} no minuto {t['minuto'].rstrip(chr(39))}. {marcador}. Forza Celta! 💙 {HASHTAGS}")
+    for eq, equipo_txt in (("celta", "Celta"), ("fortuna", "Celta Fortuna")):        # v86: goles, expulsiones y penaltis parados en directo, del Celta y del Celta Fortuna
+        tags = HASHTAGS if eq == "celta" else etiquetas(eq)
+        for fichero in sorted(f for f in datos if re.fullmatch(rf"directo_{eq}_gol_\d+\.json", f)):         # un «GOOOOOOL!» por cada gol del equipo (los del rival no se publican)
+            g = datos[fichero]
+            if not g or not g.get("goleador"):
+                continue
+            quien = re.sub(r"[^a-z0-9]+", "-", unicodedata.normalize("NFKD", g["goleador"]).encode("ascii", "ignore").decode().lower()).strip("-")
+            extra = {"penalti": " (de penalti)", "propia": " (en propia porta)"}.get(g.get("modo"), "")
+            add(f"gol-{eq}-{g['_fecha']}-{g['_id']}-{g['_n']}-{g['goles_local']}-{g['goles_visitante']}-{quien}", fichero, "resultado", "xusto agora (en directo)",
+                f"GOOOOOOL! ⚽ {g['goleador']}{extra} ({g['minuto']}). {nombre_lado(g, 'local')} {g['goles_local']} - {g['goles_visitante']} {nombre_lado(g, 'visitante')}. Forza {equipo_txt}! 💙 {tags}")
+        # v84: expulsiones (roja directa / doble amarilla, de cualquier equipo) y penaltis que para el equipo, en directo
+        for fichero in sorted(f for f in datos if re.fullmatch(rf"directo_{eq}_tarjeta_\d+\.json", f)):
+            t = datos[fichero]
+            if not t or not t.get("goleador"):
+                continue
+            quien = re.sub(r"[^a-z0-9]+", "-", unicodedata.normalize("NFKD", t["goleador"]).encode("ascii", "ignore").decode().lower()).strip("-")
+            marcador = f"{nombre_lado(t, 'local')} {t['goles_local']} - {t['goles_visitante']} {nombre_lado(t, 'visitante')}"
+            donde = f" ({t['equipo']})" if t.get("equipo") else ""
+            if t.get("clase") == "doble":
+                texto = f"🟨🟥 Dobre amarela e expulsión de {t['goleador']}{donde} no minuto {t['minuto'].rstrip(chr(39))}. {marcador}. {tags}"
+            else:
+                texto = f"🟥 Tarxeta vermella directa para {t['goleador']}{donde} no minuto {t['minuto'].rstrip(chr(39))}. {marcador}. {tags}"
+            add(f"tarjeta-{eq}-{t['_fecha']}-{t['_id']}-{quien}-{t.get('clase', 'roja')}", fichero, "resultado", "xusto agora (en directo)", texto)
+        for fichero in sorted(f for f in datos if re.fullmatch(rf"directo_{eq}_penalti_\d+\.json", f)):
+            t = datos[fichero]
+            if not t or not t.get("minuto"):
+                continue
+            marcador = f"{nombre_lado(t, 'local')} {t['goles_local']} - {t['goles_visitante']} {nombre_lado(t, 'visitante')}"
+            quien_para = f"{t['portero']} detén" if t.get("portero") else f"O {equipo_txt} detén"
+            de_quen = f" o penalti de {t['lanzador']} ({t['rival']})" if t.get("lanzador") else " un penalti"
+            add(f"penalti-parado-{eq}-{t['_fecha']}-{t['_id']}-{re.sub(r'[^0-9]+', '', t['minuto'])}", fichero, "resultado", "xusto agora (en directo)",
+                f"🧤 PENALTI PARADO! {quien_para}{de_quen} no minuto {t['minuto'].rstrip(chr(39))}. {marcador}. Forza {equipo_txt}! 💙 {tags}")
 
     tabla = {0: ("clasificacion_celta_laliga.json", "laliga", "LaLiga"), 1: ("clasificacion_celta_fortuna.json", "fortuna", "LaLiga Hypermotion (Celta Fortuna)"),
              3: ("clasificacion_as_celtas_fem.json", "as-celtas-fem", "Segunda Federación Femenina (AS Celtas)")}.get(wd)
@@ -493,9 +491,7 @@ def plan(hoy, datos, avisos):
         quien = f"o noso adestrador {c['nombre']}" if "adestrador" in (c.get("posicion") or "").lower() else c["nombre"]
         add(f"cumple-{fichero[10:-5]}-{c.get('año', hoy.year)}", fichero, "mañana", "09:00",
             f"🎂 O {c['fecha']} cumpre {c['edad']} anos {quien}! Moitas felicidades e que cumpra moitos máis co celeste no peito 💙{mencion} {etiquetas(c.get('equipo', 'celta'))}"
-            + (" 📸 Fotos: Web oficial del RC Celta (@rccelta)" if c.get("foto") else ""))      # v72: crédito obligatorio cuando se usa la foto del club
-        if c.get("instagram"):
-            out[-1]["etiquetas"] = [c["instagram"].lstrip("@")]                  # v77: mención real al jugador al publicar la historia en Instagram
+            + (" 📸 Fotos: Web oficial do RC Celta (@rccelta)" if c.get("foto") else ""))      # v72: crédito obligatorio cuando se usa la foto del club
     return out
 
 
@@ -541,7 +537,7 @@ def ventana_instagram(h, t=None):
         previsto = t.replace(hour=int(m.group(1)), minute=int(m.group(2)), second=0, microsecond=0)
         desde = max(t, previsto)
     c = h["clave"]
-    if c.startswith(("gol-", "inicio-", "descanso-")):
+    if c.startswith(("gol-", "inicio-", "descanso-", "tarjeta-", "penalti-parado-")):
         hasta = desde + datetime.timedelta(minutes=45)
     elif c.startswith("alineacion-"):
         hasta = desde + datetime.timedelta(minutes=90)             # v85: la alineación solo vale justo antes del partido
@@ -668,8 +664,10 @@ def main():
         import instagram
         if instagram.activo():
             for h in historias:
+                if h["clave"].startswith("pronostico-"):                  # v85: el pronóstico lleva la pegatina de la encuesta, que pones tú a mano: solo va a Telegram
+                    continue
                 try:
-                    instagram.encolar(h["clave"], h["imagen"], h["texto"], *ventana_instagram(h), etiquetas=h.get("etiquetas"))
+                    instagram.encolar(h["clave"], h["imagen"], h["texto"], *ventana_instagram(h))        # v86: sin etiquetas a jugadores
                 except Exception as e:
                     avisos.append(f"Instagram (preparar {h['clave']}): {e}")
 
@@ -681,7 +679,7 @@ def main():
     else:
         L.append("Hoy no hay historias automáticas nuevas.")
     L += ["", "## Contido propio que toca hoxe (aínda sen automatizar)"] + [f"- {r}" for r in RECORDATORIOS[hoy.weekday()]]
-    L += ["- Aliñación do Fortuna: non se xera. A do Celta sae soa (ESPN) cando se coñece o once."]
+    L += ["- Aliñación do Celta e do Celta Fortuna: saen soas (ESPN) cando se coñece o once."]
     L_tg = list(L)                                             # lo que llega a Telegram: sin el control de actualidad (ocupa mucho; sigue en resumen.md)
     if controles:
         L += ["", "## Control de actualidad"] + [f"- {x}" for x in controles]

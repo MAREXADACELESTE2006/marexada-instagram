@@ -648,7 +648,7 @@ def _alineacion_posiciones(datos, s):
         cy = yf + TIT + r + 2
         for i, j in enumerate(js):
             cx = x_ini + ancho * (i + 0.5)
-            ruta = caras.buscar(j.get("completo") or j["nombre"])
+            ruta = caras.buscar(j.get("completo") or j["nombre"], plantilla=True, grupo=g.get("clave"))
             if ruta:
                 _avatar(img, ruta, cx, cy, r)
                 usa_fotos = True
@@ -1295,9 +1295,9 @@ def _cara(datos):
 
 
 def _credito_fotos(img, y):
-    """«📸 Fotos: Web oficial del RC Celta (@rccelta)», con la cámara dibujada (la tipografía no tiene emojis)."""
+    """«📸 Fotos: Web oficial do RC Celta (@rccelta)», con la cámara dibujada (la tipografía no tiene emojis)."""
     d = ImageDraw.Draw(img)
-    txt = "Fotos: Web oficial del RC Celta (@rccelta)"
+    txt = "Fotos: Web oficial do RC Celta (@rccelta)"
     f = fit(d, txt, 34, W - 200, 22)
     tw = d.textlength(txt, font=f)
     x0 = (W - (tw + 54)) / 2
@@ -1626,7 +1626,7 @@ def gol(datos):
         _logo_competicion(img, logo, W // 2, y, tl)
         y += tl + (12 if foto is not None else 14)
     # --- título
-    titulo = datos.get("titulo") or "¡GOOOOOOL!"
+    titulo = datos.get("titulo") or "GOOOOOOL!"
     f = fit(d, titulo, 146 if foto is not None else 200, W - 130, 90)
     bb = d.textbbox((0, 0), titulo, font=f, stroke_width=10)
     cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))                  # resplandor azul detrás de las letras
@@ -1680,7 +1680,7 @@ def gol(datos):
         bl = d.textbbox((0, 0), l, font=fl, stroke_width=7)
         _texto_borde(d, y - bl[1], l, fl, WHITE, borde=(4, 14, 34), grosor=7)
         y += int(tam * 1.06)
-    modo = datos.get("etiqueta") or {"penalti": "DE PENALTI", "propia": "EN PROPIA PUERTA"}.get((datos.get("modo") or "").lower())     # v84: «etiqueta» para tarjetas y penaltis parados
+    modo = datos.get("etiqueta") or {"penalti": "DE PENALTI", "propia": "EN PORTA PROPIA"}.get((datos.get("modo") or "").lower())     # v84: «etiqueta» para tarjetas y penaltis parados
     if modo:
         grande = bool(datos.get("etiqueta"))                      # v84: en tarjetas y penaltis parados la etiqueta es más grande
         center(d, y + 2, modo, fit(d, modo, 46 if grande else 36, W - 100, 22), fill=AZUL)

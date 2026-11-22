@@ -1,7 +1,7 @@
-"""Marexada Celeste · alineación del Celta (primer equipo) antes del partido (v85).
+"""Marexada Celeste · alineación del Celta (primer equipo) y del Celta Fortuna (v86) antes del partido (v85).
 
 Lee el once inicial en ESPN (la misma fuente que directo.py), lo ordena por posiciones (portero, defensas, mediocentros, delanteros)
-y escribe datos_reales/alineacion_celta.json. El dibujo (con las caras) está en generar_historia.py (`_alineacion_posiciones`).
+y escribe datos_reales/alineacion_celta.json (y alineacion_fortuna.json con el estilo turquesa del Fortuna). El dibujo (con las caras) está en generar_historia.py (`_alineacion_posiciones`).
 
 Si ESPN no da el once (o lo da incompleto), se intenta besoccer. OJO: el lector de besoccer todavía NO interpreta la página (no tengo
 una copia real); solo guarda el HTML en datos_reales/alineacion_besoccer_RAW.html para poder escribirlo con datos reales.
@@ -22,7 +22,7 @@ import resultados as R
 from calendario import MADRID
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-LIGAS = (("esp.1", "liga"), ("uefa.europa", "euro"), ("esp.copa_del_rey", "copa"))
+LIGAS = {"celta": (("esp.1", "liga"), ("uefa.europa", "euro"), ("esp.copa_del_rey", "copa")), "fortuna": (("esp.2", "hm"),)}
 ANTES_MIN = 150                      # se busca la alineación desde 2 h 30 min antes del partido...
 DESPUES_MIN = 10                     # ...hasta 10 min después de empezar (después ya no tiene sentido)
 GRUPOS = ("POR", "DEF", "MED", "DEL")
@@ -162,12 +162,13 @@ def _estado(ev):
     return ((c.get("status") or ev.get("status") or {}).get("type") or {})
 
 
-def partidos_proximos(registro):
-    """Partidos del Celta (primer equipo) que no han terminado, de las tres competiciones: [(evento, clave_competicion, liga)]."""
+def partidos_proximos(registro, eq="celta"):
+    """Partidos del Celta (primer equipo) o del Fortuna que no han terminado, de sus competiciones: [(evento, clave_competicion, liga)]."""
     vistos, out = set(), []
-    for liga, k in LIGAS:
+    id_eq = R.FORTUNA_ESPN if eq == "fortuna" else R.CELTA_ESPN
+    for liga, k in LIGAS[eq]:
         base = R.ESPN.format(liga)
-        for url in (base + f"teams/{R.CELTA_ESPN}/schedule?fixture=true", base + "scoreboard"):
+        for url in (base + f"teams/{id_eq}/schedule?fixture=true", base + "scoreboard"):
             try:
                 evs = R.get(url).get("events") or []
             except Exception as e:
@@ -176,7 +177,7 @@ def partidos_proximos(registro):
             for ev in evs:
                 ids = {str((t.get("team") or {}).get("id", "")) for t in ((ev.get("competitions") or [{}])[0].get("competitors") or [])}
                 nombres = " ".join(((t.get("team") or {}).get("displayName") or "") for t in ((ev.get("competitions") or [{}])[0].get("competitors") or []))
-                if str(R.CELTA_ESPN) not in ids or R.es_fortuna(nombres) or ev.get("id") in vistos:
+                if str(id_eq) not in ids or (eq == "celta" and R.es_fortuna(nombres)) or ev.get("id") in vistos:
                     continue
                 if _estado(ev).get("completed"):
                     continue
@@ -209,9 +210,9 @@ def en_ventana(f, ahora):
     return -DESPUES_MIN <= m <= ANTES_MIN
 
 
-def datos(p, once):
+def datos(p, once, eq="celta"):
     """JSON que entiende generar.py: lo de siempre (tipo alineacion) más `grupos` (lo que dibuja el diseño con caras)."""
-    d = R.datos(p, "celta")
+    d = R.datos(p, eq)
     f = p["f"].astimezone(MADRID)
     hora = f"{f.hour:02d}:{f.minute:02d}"
     d.update(tipo="alineacion", fecha_hora=f"{d['fecha_hora']} · {hora}", _id=str(p.get("id") or ""), formacion=once.get("formacion") or "")
@@ -221,8 +222,8 @@ def datos(p, once):
     d["suplentes"] = [{"dorsal": j["dorsal"], "nombre": j["nombre"]} for j in once["suplentes"]]
     d["grupos"] = [{"clave": g, "titulo": TITULO_GRUPO[g], "jugadores": [{"dorsal": j["dorsal"], "nombre": j["nombre"], "completo": j["completo"]}
                                                                           for j in once["once"] if j["grupo"] == g]} for g in GRUPOS]
-    local_celta = R.es_celta(p["home"])
-    d["lugar"] = "Balaídos" if local_celta else None
+    local_celta = R.es_celta(p["home"]) and eq == "celta"
+    d["lugar"] = "Balaídos" if local_celta else None                     # (del Fortuna no se sabe el campo: no se pone)
     d["entrenador"] = once.get("entrenador") or None
     return {k: v for k, v in d.items() if v is not None}
 
@@ -245,48 +246,50 @@ def desde_besoccer(url, salida, registro):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--desde", default=None, help="prueba sin internet: archivo con {'events': [...], 'resumen': {...}}")
+    ap.add_argument("--equipo", default="celta", choices=("celta", "fortuna"), help="solo con --desde: de qué equipo es el archivo")
     ap.add_argument("--ahora", default=None, help="UTC AAAA-MM-DDTHH:MM:SS (por defecto, ahora)")
     ap.add_argument("--salida", default=os.path.join(BASE, "datos_reales"))
     a = ap.parse_args()
     os.makedirs(a.salida, exist_ok=True)
     ahora = datetime.datetime.fromisoformat(a.ahora).replace(tzinfo=datetime.timezone.utc) if a.ahora else datetime.datetime.now(datetime.timezone.utc)
     registro = []
-    try:
-        if a.desde:
-            j = json.load(open(a.desde, encoding="utf-8"))
-            cand = [(ev, "liga", "esp.1") for ev in j.get("events", [])]
-            resumenes = {str(j.get("resumen_id")): j.get("resumen") or {}}
-        else:
-            cand, resumenes = partidos_proximos(registro), {}
-        hechos = 0
-        for ev, k, liga in cand:
-            p = a_partido(ev, k)
-            if not p or not en_ventana(p["f"], ahora):
-                continue
-            try:
-                resumen = resumenes.get(str(p["id"])) if a.desde else R.get(R.ESPN.format(liga) + f"summary?event={p['id']}")
-            except Exception as e:
-                registro.append(f"ESPN {liga} {p['id']}: ERROR {type(e).__name__}: {e}")
-                continue
-            once = once_de_resumen(resumen or {}, R.CELTA_ESPN)
-            if not once:
-                registro.append(f"ESPN {liga} {p['id']}: todavía sin once fiable")
-                if not a.desde and 40 <= (p["f"] - ahora).total_seconds() / 60 <= 60:                 # reserva (sin interpretar aún): solo 1 o 2 veces por partido, para no martillear la web
-                    desde_besoccer("https://es.besoccer.com/equipo/partidos/rc-celta", a.salida, registro)
-                continue
-            ruta = os.path.join(a.salida, "alineacion_celta.json")
-            json.dump(datos(p, once), open(ruta, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-            print("escrito", ruta)
-            hechos += 1
-            break
-        if not hechos:
-            print("Sin alineación del Celta que publicar ahora.")
-    except Exception as e:                                       # la alineación es un extra: si algo falla, no se para nada
-        print(f"aviso: alineación sin datos ({e})", file=sys.stderr)
-    finally:
-        if registro:
-            open(os.path.join(a.salida, "alineacion_log.txt"), "w", encoding="utf-8").write(
-                datetime.datetime.now(MADRID).strftime("%Y-%m-%d %H:%M Madrid") + "\n" + "\n".join(registro) + "\n")
+    for eq in ([a.equipo] if a.desde else ["celta", "fortuna"]):
+        try:
+            id_eq = R.FORTUNA_ESPN if eq == "fortuna" else R.CELTA_ESPN
+            if a.desde:
+                j = json.load(open(a.desde, encoding="utf-8"))
+                cand = [(ev, "hm" if eq == "fortuna" else "liga", "esp.2" if eq == "fortuna" else "esp.1") for ev in j.get("events", [])]
+                resumenes = {str(j.get("resumen_id")): j.get("resumen") or {}}
+            else:
+                cand, resumenes = partidos_proximos(registro, eq), {}
+            hechos = 0
+            for ev, k, liga in cand:
+                p = a_partido(ev, k)
+                if not p or not en_ventana(p["f"], ahora):
+                    continue
+                try:
+                    resumen = resumenes.get(str(p["id"])) if a.desde else R.get(R.ESPN.format(liga) + f"summary?event={p['id']}")
+                except Exception as e:
+                    registro.append(f"ESPN {eq} {liga} {p['id']}: ERROR {type(e).__name__}: {e}")
+                    continue
+                once = once_de_resumen(resumen or {}, id_eq)
+                if not once:
+                    registro.append(f"ESPN {eq} {liga} {p['id']}: todavía sin once fiable")
+                    if eq == "celta" and not a.desde and 40 <= (p["f"] - ahora).total_seconds() / 60 <= 60:        # reserva (sin interpretar aún): solo 1 o 2 veces por partido, para no martillear la web
+                        desde_besoccer("https://es.besoccer.com/equipo/partidos/rc-celta", a.salida, registro)
+                    continue
+                ruta = os.path.join(a.salida, f"alineacion_{eq}.json")
+                json.dump(datos(p, once, eq), open(ruta, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+                print("escrito", ruta)
+                hechos += 1
+                break
+            if not hechos:
+                print(f"Sin alineación del {'Celta Fortuna' if eq == 'fortuna' else 'Celta'} que publicar ahora.")
+        except Exception as e:                                   # la alineación es un extra: si algo falla, no se para nada
+            print(f"aviso: alineación del {eq} sin datos ({e})", file=sys.stderr)
+    if registro:
+        open(os.path.join(a.salida, "alineacion_log.txt"), "w", encoding="utf-8").write(
+            datetime.datetime.now(MADRID).strftime("%Y-%m-%d %H:%M Madrid") + "\n" + "\n".join(registro) + "\n")
 
 
 if __name__ == "__main__":

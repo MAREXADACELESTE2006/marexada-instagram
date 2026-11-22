@@ -287,11 +287,11 @@ def foto_especial(datos):
         return None
     if datos.get("logo") == "europa" or datos.get("competicion") == "europa":
         return "fondo_europa.jpg"
-    if tipo == "alineacion":                                                                    # v85: la alineación del Celta lleva la foto de Balaídos
+    if tipo == "alineacion" and datos.get("tag") != "CELTA FORTUNA":                            # v85: la alineación del Celta lleva la foto de Balaídos (la del Fortuna, su estilo turquesa)
         return "fondo_alineacion_balaidos.jpg"
     if "celta-vigo" not in (datos.get("local"), datos.get("visitante")) or datos.get("tag") == "CELTA FORTUNA":
         return None
-    if tipo == "resultado" and titulo.startswith("COMIENZA"):
+    if tipo == "resultado" and titulo.startswith(("COMEZA", "COMIENZA")):
         return "fondo_inicio.jpg"
     if tipo == "resultado" and "DESCANSO" not in titulo:
         try:

@@ -3,14 +3,14 @@
 Mira si el Celta (primer equipo) o el Celta Fortuna están jugando ahora mismo (ESPN: LaLiga, Europa League, Copa del Rey e Hypermotion).
 Escribe en datos_reales/ (o en la carpeta --salida):
   Celta y Celta Fortuna:
-    directo_<equipo>_inicio.json     «COMIENZA EL PARTIDO» (primeros minutos, marcador 0-0)
+    directo_<equipo>_inicio.json     «COMEZA O ENCONTRO» (primeros minutos, marcador 0-0)
     directo_<equipo>_descanso.json   «DESCANSO» con el marcador y los goleadores de la primera parte
-  Solo el Celta (primer equipo):
-    directo_celta_gol_NN.json        «¡GOOOOOOL!» por cada gol DEL CELTA: goleador, minuto y marcador en ese momento
+  Celta y Celta Fortuna (v86):
+    directo_<equipo>_gol_NN.json     «GOOOOOOL!» por cada gol DEL CELTA o del FORTUNA (v86): goleador, minuto y marcador en ese momento
                                      (NN = número de gol del partido). Los goles del rival no se publican.
-  v84, solo el Celta (primer equipo):
-    directo_celta_tarjeta_NN.json    «¡ROJA DIRECTA!» o «¡DOBLE AMARILLA!» (expulsión de un jugador del Celta o del rival)
-    directo_celta_penalti_NN.json    «¡PENALTI PARADO!» cuando el Celta detiene un penalti del rival
+  v84 (Celta) y v86 (Celta Fortuna):
+    directo_<equipo>_tarjeta_NN.json «VERMELLA DIRECTA!» o «DOBRE AMARELA!» (expulsión de un jugador del equipo o del rival)
+    directo_<equipo>_penalti_NN.json «PENALTI PARADO!» cuando el equipo detiene un penalti del rival
 El final lo saca resultados.py como siempre (también el del Fortuna).
 Si el equipo no está jugando, no escribe nada. Nunca rompe el programa: si ESPN falla, simplemente no hay directo.
 diario.py anota en estado/publicado.json lo ya publicado, así que repetir un gol en la siguiente revisión no lo duplica.
@@ -180,10 +180,15 @@ def partir_gol(txt):
     return m.group(1).strip(), m.group(3) + "'", modo
 
 
-def goles_del_celta(p, actual):
-    """Lista de goles DEL CELTA en orden, cada uno con el marcador en ese momento y los datos del goleador.
+def _es_local(p, eq):
+    """¿Juega de local el equipo seguido (Celta o Celta Fortuna)?"""
+    return R.es_fortuna(p["home"]) if eq == "fortuna" else (R.es_celta(p["home"]) and not R.es_fortuna(p["home"]))
+
+
+def goles_del_celta(p, actual, eq="celta"):
+    """Lista de goles DEL CELTA (o del Fortuna, v86: eq="fortuna") en orden, cada uno con el marcador en ese momento y los datos del goleador.
     Solo los recientes (<= MAX_ANTIGUEDAD min de juego respecto al minuto actual). Lista vacía si el detalle no cuadra con el marcador."""
-    celta_local = R.es_celta(p["home"]) and not R.es_fortuna(p["home"])
+    celta_local = _es_local(p, eq)
     if (len(p["gol_l"]), len(p["gol_v"])) != (p["gl"], p["gv"]) and not corregir_propia_puerta(p):
         print("Goles: el detalle de goleadores todavía no cuadra con el marcador; se espera a la próxima revisión.", file=sys.stderr)
         return []
@@ -201,8 +206,8 @@ def goles_del_celta(p, actual):
     return out
 
 
-def datos_gol(p, g):
-    d = datos(p, "¡GOOOOOOL!", con_minuto=False, eq="celta")
+def datos_gol(p, g, eq="celta"):
+    d = datos(p, "GOOOOOOL!", con_minuto=False, eq=eq)
     d.update(tipo="gol", goles_local=g["gl"], goles_visitante=g["gv"], goleador=g["goleador"], minuto=g["minuto"], modo=g["modo"], lado=g["lado"], _n=g["n"])
     d.pop("goleadores_local", None)
     d.pop("goleadores_visitante", None)
@@ -284,11 +289,11 @@ def eventos_disciplina(items):
     return out
 
 
-def penalti_a_favor(e):
-    """Un penalti parado solo se publica si lo para el Celta (lo lanza el rival). Devuelve (a_favor, lanzador, portero)."""
+def penalti_a_favor(e, eq="celta"):
+    """Un penalti parado solo se publica si lo para el Celta (o el Fortuna, v86) (lo lanza el rival). Devuelve (a_favor, lanzador, portero)."""
     try:
         import caras
-        celta_id = str(R.CELTA_ESPN)
+        celta_id = str(R.FORTUNA_ESPN if eq == "fortuna" else R.CELTA_ESPN)
         nombre = e["jugador"]
         pos = (caras.posicion_de(nombre) or "") if nombre else ""
         if pos:                                                   # el nombre es de un jugador del Celta: si es el portero, lo ha parado él; si no, el que lo lanza es del Celta
@@ -307,8 +312,8 @@ def penalti_a_favor(e):
     return False, None, None
 
 
-def eventos_a_publicar(p, actual, sin_internet):
-    """Expulsiones (de cualquier equipo) y penaltis parados por el Celta del partido en juego, solo los recientes."""
+def eventos_a_publicar(p, actual, sin_internet, eq="celta"):
+    """Expulsiones (de cualquier equipo) y penaltis parados por el Celta (o el Fortuna, v86) del partido en juego, solo los recientes."""
     items = list(p.get("detalles") or [])
     if not sin_internet and p.get("liga") and p.get("id"):       # el detalle del partido (keyEvents) suele traer más datos que el marcador
         try:
@@ -320,7 +325,7 @@ def eventos_a_publicar(p, actual, sin_internet):
         if actual is not None and e["orden"] < actual - MAX_ANTIGUEDAD:
             continue
         if e["tipo"] == "penalti_parado":
-            fav, lanzador, portero = penalti_a_favor(e)
+            fav, lanzador, portero = penalti_a_favor(e, eq)
             if not fav:
                 continue
             e = dict(e, jugador=lanzador or "", portero=portero)
@@ -332,18 +337,18 @@ def _nombre_equipo(p, tid):
     return R.nombre(p["home"]) if tid and tid == p.get("home_id") else R.nombre(p["away"]) if tid and tid == p.get("away_id") else ""
 
 
-def datos_evento(p, e, n):
-    celta_local = R.es_celta(p["home"]) and not R.es_fortuna(p["home"])
+def datos_evento(p, e, n, eq="celta"):
+    celta_local = _es_local(p, eq)
     lado = "local" if celta_local else "visitante"
     if e["tipo"] == "penalti_parado":
         rival = R.nombre(p["away"] if celta_local else p["home"])
-        d = datos(p, "¡PENALTI PARADO!", con_minuto=False, eq="celta")
-        d.update(tipo="penalti_parado", goleador=(e.get("portero") or "¡NON PASA!"), minuto=e["minuto"], lado=lado,
+        d = datos(p, "PENALTI PARADO!", con_minuto=False, eq=eq)
+        d.update(tipo="penalti_parado", goleador=(e.get("portero") or "NON PASA!"), minuto=e["minuto"], lado=lado,
                  etiqueta=(f"Penalti de {e['jugador']} · {rival}" if e.get("jugador") else f"Penalti do {rival}"), portero=e.get("portero") or "", lanzador=e.get("jugador") or "", rival=rival)
     else:
         equipo = _nombre_equipo(p, e["equipo_id"])
-        del_celta = e["equipo_id"] == str(R.CELTA_ESPN)
-        d = datos(p, "¡DOBLE AMARILLA!" if e["tipo"] == "doble" else "¡ROJA DIRECTA!", con_minuto=False, eq="celta")
+        del_celta = e["equipo_id"] == str(R.FORTUNA_ESPN if eq == "fortuna" else R.CELTA_ESPN)
+        d = datos(p, "DOBRE AMARELA!" if e["tipo"] == "doble" else "VERMELLA DIRECTA!", con_minuto=False, eq=eq)
         d.update(tipo="tarjeta", goleador=e["jugador"], minuto=e["minuto"], lado=lado, icono="doble" if e["tipo"] == "doble" else "roja",
                  etiqueta=("EXPULSADO · " + equipo.upper()) if equipo else "EXPULSADO", equipo=equipo, de="celta" if del_celta else "rival", clase=e["tipo"])
     d.update(goles_local=p["gl"], goles_visitante=p["gv"], _n=n)
@@ -358,31 +363,29 @@ def escribir(ruta, d):
 
 
 def procesar(eq, p, salida, sin_internet):
-    """Un partido en juego del Celta o del Fortuna: goles (solo Celta), inicio y descanso."""
+    """Un partido en juego del Celta o del Fortuna: goles, tarjetas rojas, penaltis parados, inicio y descanso (v86: el Fortuna, igual que el Celta)."""
     m = minuto_num(p.get("minuto"))
     descanso = bool(re.search(r"HALFTIME", p.get("estado", ""), re.I))
     detallar = (p["gl"] + p["gv"] > 0) and not sin_internet and (len(p["gol_l"]), len(p["gol_v"])) != (p["gl"], p["gv"])
-    if eq == "celta" and detallar:                                 # goles: si la lista de goleadores no está completa, se pide el detalle del partido
+    if detallar:                                                   # goles: si la lista de goleadores no está completa, se pide el detalle del partido
         previos = (p["gol_l"], p["gol_v"])
         p["gol_l"], p["gol_v"] = [], []
         R.completar_goles(p)
         if not (p["gol_l"] or p["gol_v"]):
             p["gol_l"], p["gol_v"] = previos
-    elif eq == "fortuna" and detallar and (descanso or (p.get("periodo") == 2 and m and 46 <= m <= 60)) and not (p["gol_l"] or p["gol_v"]):
-        R.completar_goles(p)                                        # el Fortuna solo necesita los goleadores para el descanso
-    if eq == "celta" and p["gl"] + p["gv"] > 0:
-        for g in goles_del_celta(p, 45 if descanso else m):
-            escribir(os.path.join(salida, f"directo_celta_gol_{g['n']:02d}.json"), datos_gol(p, g))
-    if eq == "celta":                                              # v84: expulsiones y penaltis parados
+    if p["gl"] + p["gv"] > 0:
+        for g in goles_del_celta(p, 45 if descanso else m, eq):
+            escribir(os.path.join(salida, f"directo_{eq}_gol_{g['n']:02d}.json"), datos_gol(p, g, eq))
+    if True:                                                       # v84: expulsiones y penaltis parados (v86: también del Fortuna)
         try:
             nt = npp = 0
-            for e in eventos_a_publicar(p, 45 if descanso else m, sin_internet):
+            for e in eventos_a_publicar(p, 45 if descanso else m, sin_internet, eq):
                 if e["tipo"] == "penalti_parado":
                     npp += 1
-                    escribir(os.path.join(salida, f"directo_celta_penalti_{npp:02d}.json"), datos_evento(p, e, npp))
+                    escribir(os.path.join(salida, f"directo_{eq}_penalti_{npp:02d}.json"), datos_evento(p, e, npp, eq))
                 else:
                     nt += 1
-                    escribir(os.path.join(salida, f"directo_celta_tarjeta_{nt:02d}.json"), datos_evento(p, e, nt))
+                    escribir(os.path.join(salida, f"directo_{eq}_tarjeta_{nt:02d}.json"), datos_evento(p, e, nt, eq))
         except Exception as e:
             print(f"aviso: tarjetas/penaltis no disponibles ({e})", file=sys.stderr)
     if descanso:
@@ -394,7 +397,7 @@ def procesar(eq, p, salida, sin_internet):
             return
         escribir(os.path.join(salida, f"directo_{eq}_descanso.json"), datos(q, "DESCANSO", con_minuto=False, eq=eq))
     elif p["gl"] + p["gv"] == 0 and (p.get("periodo") or 1) == 1 and (m is None or m <= 15):
-        escribir(os.path.join(salida, f"directo_{eq}_inicio.json"), datos(p, "COMIENZA EL PARTIDO", con_minuto=False, eq=eq))
+        escribir(os.path.join(salida, f"directo_{eq}_inicio.json"), datos(p, "COMEZA O ENCONTRO", con_minuto=False, eq=eq))
     else:
         print(f"{eq}: en juego, pero ahora no toca inicio ni descanso.")
 

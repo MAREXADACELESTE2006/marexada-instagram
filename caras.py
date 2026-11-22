@@ -27,10 +27,18 @@ def _candidatos():
         ruta = os.path.join(BASE, "assets", "caras", _slug(p["nombre"]) + ".webp")
         if os.path.exists(ruta):
             out.append((_slug(p["nombre"]).split("-"), ruta, (p.get("instagram") or "").lstrip("@"), p.get("posicion") or ""))
+    conocidas = {r for _t, r, _i, _p in out}
+    carpeta = os.path.join(BASE, "assets", "caras")                      # v86: fotos sin ficha en cumpleanos.json (Celta Fortuna): el nombre sale del archivo
+    for f in sorted(os.listdir(carpeta)) if os.path.isdir(carpeta) else []:
+        ruta = os.path.join(carpeta, f)
+        if f.lower().endswith((".webp", ".png")) and ruta not in conocidas:
+            out.append((os.path.splitext(f)[0].split("-"), ruta, "", ""))
     return out
 
 
-def buscar(nombre):
+def buscar(nombre, plantilla=False, grupo=None):
+    """plantilla=True (v86): el jugador es seguro del Celta (p. ej. el once de la alineación); si el nombre no cuadra del todo («Andrei Radu» por
+    «Ionuț Radu») se acepta el apellido cuando solo UN jugador de la plantilla lo lleva. Con plantilla=False (rivales, goleadores) se sigue sin adivinar."""
     s = _slug(nombre)
     if not s:
         return None
@@ -46,6 +54,12 @@ def buscar(nombre):
     ok = [(t, r) for t, r, _ig, _pos in cands if all(x in t for x in resto) and all(t[0].startswith(i) for i in iniciales)]
     if len(ok) == 1 and (iniciales or len(resto) >= 2 or resto[0] != ok[0][0][0]):      # un nombre de pila suelto («Hugo», «Javi») nunca vale
         return ok[0][1]
+    if plantilla and len(resto) >= 2:                                    # v86: apellido único en la plantilla (y, si se sabe, en la misma línea: POR/DEF/MED/DEL)
+        import alineacion
+        ap = [(t, r) for t, r, _ig, pos in cands if t[-1] == resto[-1] and len(resto[-1]) >= 4
+              and (grupo is None or alineacion.grupo_de_gallego(pos) in (None, grupo))]
+        if len(ap) == 1:
+            return ap[0][1]
     return None
 
 

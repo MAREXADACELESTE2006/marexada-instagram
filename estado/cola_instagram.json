@@ -53,41 +53,6 @@
   "publicada": "2026-11-21T15:10:06.861539+01:00"
  },
  {
-  "clave": "inicio-celta-2026-11-21-401882798",
-  "nombre": "inicio-celta-2026-11-21-401882798-1795291844.jpg",
-  "sha": "b02ed5a223dbd42e4f0f71b74e733db5a9fb27ca",
-  "url": "https://raw.githubusercontent.com/MAREXADACELESTE2006/marexada-instagram/imagenes/historias/inicio-celta-2026-11-21-401882798-1795291844.jpg",
-  "texto": "Comeza o partido! Real Madrid - Celta. Forza Celta! 💙 #RCCelta #Celta #MarexadaCeleste",
-  "desde": "2026-11-21T21:10:44.746030+01:00",
-  "hasta": "2026-11-21T21:55:44.746030+01:00",
-  "estado": "publicada",
-  "intentos": 0,
-  "id": "17913726777657921",
-  "creada": "2026-11-21T21:10:47.036328+01:00",
-  "publicada": "2026-11-21T21:10:58.435069+01:00"
- },
- {
-  "clave": "gol-celta-2026-11-21-401882798-1-0-1-pablo-duran",
-  "nombre": "gol-celta-2026-11-21-401882798-1-0-1-pablo-duran-1795292157.jpg",
-  "sha": "7c049a307d6c53cce08b814d5d932fd2f5ce87ed",
-  "url": "https://raw.githubusercontent.com/MAREXADACELESTE2006/marexada-instagram/imagenes/historias/gol-celta-2026-11-21-401882798-1-0-1-pablo-duran-1795292157.jpg",
-  "texto": "GOOOOOOL! ⚽ Pablo Durán @pabloduraan_ (6'). Real Madrid 0 - 1 Celta. Forza Celta! 💙 #RCCelta #Celta #MarexadaCeleste",
-  "desde": "2026-11-21T21:15:57.056186+01:00",
-  "hasta": "2026-11-21T22:00:57.056186+01:00",
-  "estado": "fallida",
-  "intentos": 3,
-  "id": null,
-  "creada": "2026-11-21T21:15:58.764126+01:00",
-  "etiquetas": [
-   {
-    "username": "pabloduraan_",
-    "x": 0.5,
-    "y": 0.426
-   }
-  ],
-  "ultimo_error": "'dict' object has no attribute 'lstrip'"
- },
- {
   "clave": "descanso-celta-2026-11-21-401882798",
   "nombre": "descanso-celta-2026-11-21-401882798-1795294867.jpg",
   "sha": "d386f27fcb7d55b822e0355e56d53945534b2caa",

@@ -94,6 +94,7 @@ _TEMAS = {"copa": {"navy": (86, 8, 28), "acento": (255, 178, 178)},            #
           "europa": {"navy": (34, 16, 6), "acento": (255, 150, 48)},          # Europa League: fondo oscuro cálido y acento naranja
           "hypermotion": {"navy": (3, 38, 42), "acento": (72, 226, 214)}}     # v60: LaLiga Hypermotion (Celta Fortuna): fondo verde petróleo y acento turquesa
 _TEMAS_TAG = {"AS CELTAS FEM": {"navy": (32, 14, 58), "acento": (206, 172, 255)},      # v60: AS Celtas (femenino): fondo violeta oscuro y acento lila
+              "CELTA FEMXA ZORKA": {"navy": (8, 30, 58), "acento": (255, 146, 48)},            # v87: baloncesto femenino: azul marino y acento naranja
               "CELTA FORTUNA": {"navy": (3, 38, 42), "acento": (72, 226, 214)}}         # v61: el Celta Fortuna siempre en turquesa (parte médico, etc.), aunque no lleve logo de competición   # v60: AS Celtas (femenino): fondo violeta oscuro y acento lila
 
 
@@ -264,7 +265,7 @@ def _escudo_redondo(img, cx, cy, slug, siglas_txt, r=118):
 
 def _tag_v33(datos):
     t = datos.get("tag")
-    return t if t in ("CELTA FORTUNA", "AS CELTAS FEM") else "REAL CLUB CELTA DE VIGO"
+    return t if t in ("CELTA FORTUNA", "AS CELTAS FEM", "CELTA FEMXA ZORKA") else "REAL CLUB CELTA DE VIGO"
 
 
 def _logo_competicion(img, logo, cx, y, lado=144):

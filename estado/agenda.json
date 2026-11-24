@@ -1,5 +1,5 @@
 {
- "actualizada": "2026-11-24",
+ "actualizada": "2026-11-25",
  "partidos": [
   {
    "equipo": "as_celtas_fem",
@@ -24,7 +24,7 @@
   {
    "equipo": "celta",
    "fecha": "2026-11-21",
-   "hora": "21:00"
+   "hora": null
   },
   {
    "equipo": "celta",

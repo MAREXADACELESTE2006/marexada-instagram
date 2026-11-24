@@ -459,6 +459,15 @@ def plan(hoy, datos, avisos):
         if d:
             add(f"clasificacion-{tabla[1]}-{d['jornada']}", tabla[0], "tarde", "19:00",
                 f"Así está a clasificación de {tabla[2]} tras a {d['jornada'].lower()}. 💙 {etiquetas(tabla[1])}")
+    # v87: clasificación de la Liga Femenina Endesa (Celta Femxa Zorka), de la web de la Federación: los LUNES a las 13:00 (hora que no usa ninguna otra historia),
+    # cuando ya ha terminado la jornada del fin de semana. Una sola vez por jornada (la clave lleva la jornada).
+    cb = datos.get("clasificacion_baloncesto_fem.json")
+    fecha_cb = fecha_de(cb) if cb else None
+    if cb and fecha_cb and wd == 0 and 0 <= (hoy - fecha_cb).days <= 6 and cb.get("filas"):
+        mio = next((f for f in cb["filas"] if f.get("nombre") == cb.get("destacado")), None)
+        donde = f" O Celta Femxa Zorka é {mio['pos']}º con {mio['pts']} puntos." if mio else ""
+        add(f"clasificacion-baloncesto-fem-{cb['jornada']}", "clasificacion_baloncesto_fem.json", "mañana", "13:00",
+            f"Así está a clasificación da Liga Femenina Endesa tras a {cb['jornada'].lower()}.{donde} 🏀 💙 {etiquetas('baloncesto-fem')}")
     # Parte médico: sale una historia cuando el parte cambia (entra o sale alguien, o cambia un diagnóstico).
     for nombre in ("celta", "fortuna"):
         for fichero in sorted(f for f in datos if re.fullmatch(rf"partemedico_{nombre}(_\d+)?\.json", f)):
@@ -588,6 +597,8 @@ def main():
             ("partemedico.py", ["--hoy", hoy.isoformat(), "--desde", fx("partemedico_REAL"), "--salida", d_datos], "Parte médico (rccelta.es)"),
             ("entradas.py", ["--hoy", hoy.isoformat(), "--desde", fx("entradas_RECONSTRUIDO"), "--salida", d_datos], "Entradas (rccelta.es)"),
             ("cumpleanos.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Cumpleaños"),
+            ("clasificacion_baloncesto.py", ["--desde", fx("feb_clasificacion_RECONSTRUIDO.html"), "--salida", d_datos], "Clasificación LF Endesa (Federación)"),
+            ("baloncesto.py", ["--feb", fx("feb_resultados_RECONSTRUIDO.html"), "--calendario", fx("betexplorer_baloncesto_calendario_RECONSTRUIDO.html"), "--resultados", fx("betexplorer_baloncesto_resultados_RECONSTRUIDO.html"), "--hoy", hoy.isoformat(), "--salida", d_datos], "Celta Femxa Zorka (prueba)"),
         ]
     else:
         ahora = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
@@ -600,6 +611,7 @@ def main():
             ("alineacion.py", ["--ahora", ahora, "--salida", d_datos], "Alineación del Celta (ESPN)"),     # v85
             ("futbolme.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "AS Celtas Fem (futbolme)"),
             ("baloncesto.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Celta Femxa Zorka (BetExplorer)"),        # v87
+            ("clasificacion_baloncesto.py", ["--salida", d_datos], "Clasificación LF Endesa (Federación)"),               # v87
             ("partemedico.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Parte médico (rccelta.es)"),
             ("entradas.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Entradas (rccelta.es)"),
             ("cumpleanos.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Cumpleaños"),

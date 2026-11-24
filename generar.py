@@ -283,10 +283,10 @@ def foto_especial(datos):
     tipo, titulo = datos.get("tipo"), (datos.get("titulo") or "").upper()
     if tipo in ("gol", "tarjeta", "penalti_parado"):                                           # v80: el gol en Europa League lleva el fondo y el estilo de Europa; el resto de goles, su fondo de siempre
         return "fondo_europa.jpg" if (datos.get("logo") == "europa" or datos.get("competicion") == "europa") else None
+    if datos.get("tag") == "CELTA FEMXA ZORKA" and tipo in ("previa", "proximo", "convocatoria", "alineacion", "resultado", "clasificacion"):   # v87: baloncesto femenino: pabellón de Navia (próximo, clasificación) y afición (resultado)
+        return "fondo_baloncesto_aficion.jpg" if tipo == "resultado" else "fondo_baloncesto_navia.jpg"
     if tipo not in ("previa", "proximo", "convocatoria", "alineacion", "resultado"):
         return None
-    if datos.get("tag") == "CELTA FEMXA ZORKA":                                                  # v87: baloncesto femenino: pabellón de Navia (próximo) y afición (resultado)
-        return "fondo_baloncesto_aficion.jpg" if tipo == "resultado" else "fondo_baloncesto_navia.jpg"
     if datos.get("logo") == "europa" or datos.get("competicion") == "europa":
         return "fondo_europa.jpg"
     if tipo == "alineacion" and datos.get("tag") != "CELTA FORTUNA":                            # v85: la alineación del Celta lleva la foto de Balaídos (la del Fortuna, su estilo turquesa)

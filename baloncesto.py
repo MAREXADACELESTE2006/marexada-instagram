@@ -1,13 +1,14 @@
-"""Marexada Celeste · Celta Femxa Zorka (baloncesto femenino, Liga Femenina Endesa) desde BetExplorer (v87).
+"""Marexada Celeste · Celta Femxa Zorka (baloncesto femenino, Liga Femenina Endesa) desde la web de la Federación y BetExplorer (v87).
 
 Como con el AS Celtas Fem, solo se publican DOS cosas: el próximo partido y el resultado (nada de directo, alineación ni convocatoria).
-Lee dos páginas públicas de betexplorer.com del equipo (calendario y resultados) y escribe en datos_reales/ (o en --salida):
+Lee la página oficial de resultados de la FEB (feb.es/lfendesa/resultados.aspx: marcador, día y hora de la jornada) y, de reserva y para el calendario,
+dos páginas públicas de betexplorer.com del equipo (calendario y resultados). Escribe en datos_reales/ (o en --salida):
     proximo_baloncesto_fem.json      (próximo partido)
     resultado_baloncesto_fem.json    (último partido jugado)
 
 Uso:
     python baloncesto.py                                                  (lee internet)
-    python baloncesto.py --calendario a.html --resultados b.html --hoy 2026-11-23 --salida carpeta     (prueba sin internet)
+    python baloncesto.py --calendario a.html --resultados b.html --feb c.html --hoy 2026-11-23 --salida carpeta     (prueba sin internet)
 Si la página cambia y no se entiende, guarda lo recibido en baloncesto_*_DEBUG.html para poder ajustarlo.
 HORAS: BetExplorer las da en hora de Madrid (a comprobar con el primer partido). Si salieran desplazadas, se corrige sin tocar código
 poniendo la variable BALONCESTO_DESFASE_MIN (minutos, p. ej. 60 o -60) en GitHub → Settings → Variables → Actions.
@@ -24,6 +25,7 @@ import urllib.request
 BASE = os.path.dirname(os.path.abspath(__file__))
 URL_CALENDARIO = "https://www.betexplorer.com/basketball/team/celta/pMyy6Tm6/fixtures/"
 URL_RESULTADOS = "https://www.betexplorer.com/basketball/team/celta/pMyy6Tm6/results/"
+URL_FEB = "https://www.feb.es/lfendesa/resultados.aspx"
 TAG = "CELTA FEMXA ZORKA"
 DIA = ["Lun", "Mar", "Mér", "Xov", "Ven", "Sáb", "Dom"]
 
@@ -47,6 +49,12 @@ EQUIPOS = {
     "idk gipuzkoa": ("mirai-euskotren", "Mirai Euskotren"),
     "gernika bizkaia": ("inversus-gernika-bizkaia", "Inversus Gernika Bizkaia"),
 }
+# v87: los nombres que usa la web de la Federación (feb.es) para la clasificación
+for _n, _e in {"celta femxa zorka": "celta", "innova tsn leganes": "leganes", "azulmarino mallorca palma": "mallorca palma", "movistar estudiantes": "estudiantes",
+               "spar girona": "girona", "meins avenida": "perfumerias avenida", "baxi ferrol": "ferrol", "duran maquinaria ensino": "ensino", "kutxabank araski": "araski",
+               "casademont zaragoza": "zaragoza", "impulso 360 estepona": "estepona", "valencia b c": "valencia", "valencia basket": "valencia", "hozono global jairis": "jairis",
+               "mirai euskotren": "idk gipuzkoa", "inversus gernika bizkaia": "gernika bizkaia"}.items():
+    EQUIPOS[_n] = EQUIPOS[_e]
 
 
 class ErrorLector(Exception):
@@ -117,6 +125,33 @@ def leer_partidos(html):
     return out
 
 
+def leer_feb(html):
+    """Página de resultados de la FEB -> partidos de la jornada que enseña: [{jornada, local, visitante, fecha, hora, puntos, origen}].
+    Cada partido empieza con «Día: dd/mm/aaaa / Hora: hh:mm», sigue con los dos equipos y el marcador («79 - 74») y termina en «Parciales»."""
+    html = re.sub(r"(?is)<(script|style)\b.*?</\1>", " ", html)
+    t = limpio(html)
+    rondas = [(datetime.date(int(m.group(4)), int(m.group(3)), int(m.group(2))), int(m.group(1)))
+              for m in re.finditer(r"Jornada\s+(\d+)\s*\((\d{2})/(\d{2})/(\d{4})\)", t)]
+    out = []
+    for m in re.finditer(r"D[ií]a:\s*(\d{2})/(\d{2})/(\d{4})\s*/\s*Hora:\s*(\d{1,2}):(\d{2})\s*(.*?)(?=D[ií]a:\s*\d{2}/|Parciales|$)", t, re.S):
+        fecha = datetime.date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+        cuerpo = m.group(6).strip()
+        puntos = None
+        ms = re.search(r"(\d{1,3})\s*-\s*(\d{1,3})\s*$", cuerpo)
+        if ms:
+            puntos = (int(ms.group(1)), int(ms.group(2)))
+            cuerpo = cuerpo[:ms.start()].strip()
+        palabras = cuerpo.split()
+        for k in range(1, len(palabras)):                      # los dos nombres van seguidos: se parte donde ambos son equipos conocidos
+            local, visitante = " ".join(palabras[:k]), " ".join(palabras[k:])
+            if norm(local) in EQUIPOS and norm(visitante) in EQUIPOS:
+                prev = [n for d, n in rondas if d <= fecha]
+                out.append({"jornada": max(prev) if prev else 0, "local": local, "visitante": visitante, "fecha": fecha,
+                            "hora": f"{int(m.group(4)):02d}:{m.group(5)}", "puntos": puntos, "origen": "feb"})
+                break
+    return out
+
+
 def con_desfase(p):
     """Aplica BALONCESTO_DESFASE_MIN (si lo hay) a la hora, por si BetExplorer la diera en otra zona."""
     try:
@@ -130,7 +165,7 @@ def con_desfase(p):
 
 
 def es_del_celta(p):
-    return "celta" in (norm(re.sub(r"\s+W$", "", p["local"])), norm(re.sub(r"\s+W$", "", p["visitante"])))
+    return any(norm(re.sub(r"\s+W$", "", n)).startswith("celta") for n in (p["local"], p["visitante"]))
 
 
 def datos_partido(p, tipo):
@@ -150,6 +185,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--calendario", default=URL_CALENDARIO)
     ap.add_argument("--resultados", default=URL_RESULTADOS)
+    ap.add_argument("--feb", default=URL_FEB)
     ap.add_argument("--hoy", default=None, help="fecha AAAA-MM-DD (por defecto, hoy)")
     ap.add_argument("--salida", default=os.path.join(BASE, "datos_reales"))
     a = ap.parse_args()
@@ -162,32 +198,37 @@ def main():
             json.dump(datos, f, ensure_ascii=False, indent=1)
         print("escrito", ruta)
 
-    def partidos_de(nombre, fuente):
+    def partidos_de(nombre, fuente, lector):
         html = leer(fuente)
-        ps = [con_desfase(p) for p in leer_partidos(html) if es_del_celta(p)]
-        if not ps:                                           # ni una fila reconocible: la página habrá cambiado
+        ps = [con_desfase(p) if p.get("origen") != "feb" else p for p in lector(html) if es_del_celta(p)]
+        if not ps:                                           # ni una fila reconocible: la página habrá cambiado (o el Celta no juega en la jornada que enseña)
             with open(os.path.join(a.salida, f"baloncesto_{nombre}_DEBUG.html"), "w", encoding="utf-8") as f:
                 f.write(html)
             print(f"aviso: guardada baloncesto_{nombre}_DEBUG.html ({len(html)} caracteres)", file=sys.stderr)
-            raise ErrorLector(f"No encuentro los partidos del Celta Femxa Zorka en BetExplorer ({nombre}); ¿ha cambiado la página?")
+            raise ErrorLector(f"No encuentro los partidos del Celta Femxa Zorka en {nombre}; ¿ha cambiado la página?")
         return ps
 
-    try:
-        futuros = [p for p in partidos_de("calendario", a.calendario) if p["puntos"] is None and p["fecha"] >= hoy]
-        if futuros:
-            guardar("proximo_baloncesto_fem.json", datos_partido(min(futuros, key=lambda p: (p["fecha"], p["hora"] or "")), "proximo"))
-        else:
-            print("Sin próximo partido del Celta Femxa Zorka en el calendario.")
-    except ErrorLector as e:
-        print(f"aviso: {e}", file=sys.stderr)
-    try:
-        jugados = [p for p in partidos_de("resultados", a.resultados) if p["puntos"] is not None and p["fecha"] <= hoy]
-        if jugados:
-            guardar("resultado_baloncesto_fem.json", datos_partido(max(jugados, key=lambda p: p["fecha"]), "resultado"))
-        else:
-            print("Sin resultados del Celta Femxa Zorka todavía.")
-    except ErrorLector as e:
-        print(f"aviso: {e}", file=sys.stderr)
+    todos = []
+    for nombre, fuente, lector, origen in (("feb", a.feb, leer_feb, "feb"), ("calendario", a.calendario, leer_partidos, "bet"), ("resultados", a.resultados, leer_partidos, "bet")):
+        try:
+            todos += [dict(p, origen=origen) for p in partidos_de(nombre, fuente, lector)]
+        except ErrorLector as e:
+            print(f"aviso: {e}", file=sys.stderr)
+        except OSError as e:                                 # sin conexión o web caída: se sigue con la otra fuente
+            print(f"aviso: no se pudo leer {nombre}: {e}", file=sys.stderr)
+    if not todos:
+        raise ErrorLector("Ninguna fuente del baloncesto ha dado datos.")
+    prefiere_feb = lambda p: 0 if p["origen"] == "feb" else 1         # a igualdad de día, manda la web oficial (hora y marcador)
+    futuros = [p for p in todos if p["puntos"] is None and p["fecha"] >= hoy]
+    if futuros:
+        guardar("proximo_baloncesto_fem.json", datos_partido(min(futuros, key=lambda p: (p["fecha"], prefiere_feb(p), p["hora"] or "")), "proximo"))
+    else:
+        print("Sin próximo partido del Celta Femxa Zorka en el calendario.")
+    jugados = [p for p in todos if p["puntos"] is not None and p["fecha"] <= hoy]
+    if jugados:
+        guardar("resultado_baloncesto_fem.json", datos_partido(max(jugados, key=lambda p: (p["fecha"], -prefiere_feb(p))), "resultado"))
+    else:
+        print("Sin resultados del Celta Femxa Zorka todavía.")
 
 
 if __name__ == "__main__":

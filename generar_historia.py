@@ -1239,7 +1239,10 @@ def efemeride(datos):
 def entradas(datos):
     img = fondo(); d = ImageDraw.Draw(img)
     titulo = "ENTRADAS VISITANTES" if datos.get("visitantes") else "ENTRADAS"
-    cabecera(img, d, datos.get("tag", ""), titulo, None, ytitulo=205)
+    cabecera(img, d, "" if datos.get("visitantes") else datos.get("tag", ""), titulo, None, ytitulo=205)
+    if datos.get("visitantes"):
+        _cabecera_aviso(img, 140)                           # v91/v92: en vez de «REAL CLUB CELTA», una campana de alarma y «AVISO»
+        d = ImageDraw.Draw(img)
     logo = datos.get("logo")
     if logo in LOGOS and os.path.exists(os.path.join(ASSETS, "marca", LOGOS[logo])):
         pegar(img, os.path.join(ASSETS, "marca", LOGOS[logo]), 445, 322, (190, 190))
@@ -2177,4 +2180,116 @@ def almanaque(datos):
     return img
 
 
-RENDER = {"gol": gol, "tarjeta": gol, "penalti_parado": gol, "historia_portada": historia_portada, "almanaque": almanaque, "pronostico": pronostico, "efemeride": efemeride, "cumpleanos": cumpleanos, "entradas": entradas, "partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}
+# ---------------------------------------------------------------- AVISO de entradas de visitante + imagen para peñistas (v91, rediseñado en v92)
+CONTACTO_PENA = {"whatsapp": "623 785 395", "email": "marexadaceleste2006@gmail.com", "web": "marexadaceleste.com"}      # contacto oficial de la peña (se puede cambiar en el JSON: campos whatsapp, email, web)
+AMBAR = (255, 196, 40)
+OSCURO_AVISO = (10, 35, 57)
+
+
+def _icono(img, cx, cy, tam, dibujar):
+    """Pega un icono dibujado a 4x de tamaño (para que salga suave). dibujar(dd, k): coordenadas de 0 a 100, k = píxeles por unidad."""
+    S = 4
+    lienzo = Image.new("RGBA", (tam * S, tam * S), (0, 0, 0, 0))
+    dibujar(ImageDraw.Draw(lienzo), tam * S / 100)
+    lienzo = lienzo.resize((tam, tam), Image.LANCZOS)
+    img.paste(lienzo, (int(cx - tam / 2), int(cy - tam / 2)), lienzo)
+
+
+def _dib_alarma(c):
+    def f(dd, k):
+        dd.ellipse([32 * k, 14 * k, 68 * k, 50 * k], fill=c)                                          # cúpula de la campana
+        dd.polygon([(32 * k, 32 * k), (68 * k, 32 * k), (79 * k, 66 * k), (21 * k, 66 * k)], fill=c)    # cuerpo
+        dd.rounded_rectangle([17 * k, 64 * k, 83 * k, 73 * k], 4.5 * k, fill=c)                       # borde
+        dd.ellipse([43 * k, 72 * k, 57 * k, 86 * k], fill=c)                                          # badajo
+        dd.ellipse([45 * k, 7 * k, 55 * k, 17 * k], fill=c)                                           # asa
+        for r, w in ((26, 5), (38, 5)):                                                               # ondas de sonido a los dos lados
+            dd.arc([(50 - r) * k, (40 - r) * k, (50 + r) * k, (40 + r) * k], 158, 202, fill=c, width=int(w * k))
+            dd.arc([(50 - r) * k, (40 - r) * k, (50 + r) * k, (40 + r) * k], -22, 22, fill=c, width=int(w * k))
+    return f
+
+
+def _cabecera_aviso(img, cy=140):
+    """Sustituye al «REAL CLUB CELTA» de arriba en las entradas de visitante: una campana de alarma y «A V I S O» en ámbar,
+    con la misma tipografía que el resto de la cabecera y dos líneas finas a los lados (sin pastillas ni halos)."""
+    d = ImageDraw.Draw(img)
+    f, esp = font(50), 12
+    letras = "AVISO"
+    tw = sum(d.textlength(c, font=f) for c in letras) + esp * (len(letras) - 1)
+    bell, hueco = 74, 24
+    total = bell + hueco + tw
+    x0 = (W - total) / 2
+    lin = Image.new("RGBA", (W, 12), (0, 0, 0, 0))
+    ld = ImageDraw.Draw(lin)
+    ld.line([(70, 6), (x0 - 34, 6)], fill=AMBAR + (170,), width=3)
+    ld.line([(x0 + total + 34, 6), (W - 70, 6)], fill=AMBAR + (170,), width=3)
+    img.paste(lin, (0, cy - 6), lin)
+    _icono(img, x0 + bell / 2, cy, bell, _dib_alarma(AMBAR))
+    d = ImageDraw.Draw(img)
+    x = x0 + bell + hueco
+    for c in letras:
+        d.text((x, cy - f.size * 0.70), c, font=f, fill=AMBAR)
+        x += d.textlength(c, font=f) + esp
+
+
+def _dib_whatsapp(c):
+    def f(dd, k):
+        dd.ellipse([20 * k, 20 * k, 80 * k, 80 * k], outline=c, width=int(7 * k))                      # globo de conversación
+        dd.polygon([(14 * k, 88 * k), (21 * k, 64 * k), (38 * k, 78 * k)], fill=c)                      # cola del globo
+        dd.line([(41 * k, 37 * k), (38 * k, 45 * k), (47 * k, 58 * k), (60 * k, 65 * k), (66 * k, 61 * k)], fill=c, width=int(7 * k), joint="curve")   # auricular
+    return f
+
+
+def _dib_sobre(c, fondo_c):
+    def f(dd, k):
+        dd.rounded_rectangle([14 * k, 26 * k, 86 * k, 74 * k], 7 * k, fill=c)
+        dd.line([(18 * k, 32 * k), (50 * k, 56 * k), (82 * k, 32 * k)], fill=fondo_c, width=int(6 * k), joint="curve")
+    return f
+
+
+def aviso_pena(datos):
+    """Segunda historia de las entradas de visitante: mensaje para peñistas (gestión de la entrada) y para quien aún no es socio.
+    Mismo lenguaje visual que el resto (cabecera con AVISO, tarjeta translúcida, círculos de acento, tipografía de siempre)."""
+    img = fondo(); d = ImageDraw.Draw(img)
+    cabecera(img, d, "", "ENTRADAS VISITANTES", None, ytitulo=205)
+    _cabecera_aviso(img, 140)
+    d = ImageDraw.Draw(img)
+    claro = (200, 218, 240)
+    if datos.get("local_nombre") and datos.get("visitante_nombre"):
+        t = f"{datos['local_nombre']} - {datos['visitante_nombre']}"
+        center(d, 318, t, fit(d, t, 44, W - 120, 26), fill=AZUL)
+    # ---- mensaje para peñistas
+    _esp(d, W // 2, 440, "PARA PEÑISTAS", font_m(36), AZUL, 10)
+    y = 508
+    for l in ("QUERES QUE CHE", "XESTIONEMOS A ENTRADA", "DE VISITANTE?"):
+        center(d, y, l, fit(d, l, 74, W - 140, 40), fill=WHITE); y += 88
+    d.rounded_rectangle([W // 2 - 60, y + 14, W // 2 + 60, y + 18], 2, fill=AZUL)
+    center(d, y + 46, "Ponte en contacto connosco", fit(d, "Ponte en contacto connosco", 44, W - 140, 30), fill=claro)
+    # ---- datos de contacto: tarjeta translúcida con dos filas (como los puntos 1, 2, 3 de las entradas)
+    py = y + 150
+    alto_fila = 118
+    cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    cd = ImageDraw.Draw(cap)
+    cd.rounded_rectangle([40, py, W - 40, py + alto_fila * 2], 16, fill=(255, 255, 255, 30))
+    cd.line([(150, py + alto_fila), (W - 70, py + alto_fila)], fill=(255, 255, 255, 60), width=2)
+    img.paste(cap, (0, 0), cap)
+    filas = ((_dib_whatsapp(OSCURO_AVISO), "WhatsApp", datos.get("whatsapp", CONTACTO_PENA["whatsapp"])),
+             (_dib_sobre(OSCURO_AVISO, AZUL), "Correo electrónico", datos.get("email", CONTACTO_PENA["email"])))
+    for i, (icono, etiqueta, valor) in enumerate(filas):
+        cy = py + alto_fila * i + alto_fila // 2
+        d = ImageDraw.Draw(img)
+        d.ellipse([98 - 38, cy - 38, 98 + 38, cy + 38], fill=AZUL)
+        _icono(img, 98, cy, 62, icono)
+        d = ImageDraw.Draw(img)
+        d.text((165, cy - 40), etiqueta, font=font_m(26), fill=claro)
+        d.text((165, cy - 8), valor, font=fit(d, valor, 46, W - 165 - 100, 28), fill=WHITE)
+    # ---- si no eres socio
+    y = py + alto_fila * 2 + 96
+    _esp(d, W // 2, y, "E SE AÍNDA NON ES SOCIO/A?", font_m(34), claro, 6)
+    center(d, y + 56, "ÚNETE Á PEÑA!", fit(d, "ÚNETE Á PEÑA!", 112, W - 120, 60), fill=AZUL)
+    center(d, y + 196, "Prioridade nas entradas de visitante,", font_m(33), fill=WHITE)
+    center(d, y + 238, "sorteos, viaxes, descontos e moito máis", font_m(33), fill=WHITE)
+    pie(img, ImageDraw.Draw(img))
+    return img
+
+
+RENDER = {"gol": gol, "tarjeta": gol, "penalti_parado": gol, "historia_portada": historia_portada, "almanaque": almanaque, "pronostico": pronostico, "efemeride": efemeride, "cumpleanos": cumpleanos, "entradas": entradas, "partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion, "aviso_pena": aviso_pena}

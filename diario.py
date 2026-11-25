@@ -204,7 +204,7 @@ def etiquetas(nombre):
 
 # ---------------------------------------------------------------- control de actualidad (obligatorio antes de generar una imagen)
 MAX_DIAS_NOTICIA = 2
-CONTROLADOS = {"entradas", "partemedico", "cumpleanos", "pronostico"}                 # historias basadas en noticias o datos que pueden quedarse viejos
+CONTROLADOS = {"entradas", "aviso_pena", "partemedico", "cumpleanos", "pronostico"}                 # historias basadas en noticias o datos que pueden quedarse viejos
 RELATIVOS = re.compile(r"\b(hoy|hoxe|ma[ñn][aá]n?a|ma[ñn]á|ayer|onte|ahora mismo|[uú]ltimas? horas?|esta (?:tarde|noche|semana)|este fin de semana|"
                        r"en breve|dende hoxe|desde hoy)\b", re.I)
 
@@ -220,7 +220,7 @@ def control_actualidad(h, jd, datos, hoy):
     plazo_vigente = bool(jd.get("plazo_fin")) and datetime.date.fromisoformat(jd["plazo_fin"][:10]) >= hoy                 # v88: pre-reserva de entradas de visitante todavía abierta
     if pub and (hoy - datetime.date.fromisoformat(pub)).days > MAX_DIAS_NOTICIA and not plazo_vigente:
         return False, f"{info} → DESCARTADA: noticia de hace {(hoy - datetime.date.fromisoformat(pub)).days} días"
-    if jd.get("tipo") == "entradas":
+    if jd.get("tipo") in ("entradas", "aviso_pena"):
         if not evento:                                           # sin fecha en la noticia: se contrasta con el calendario oficial
             rival = {jd.get("local"), jd.get("visitante")} - {"celta-vigo", None}
             for f in ("proximo_celta.json", "proximo_fortuna.json"):
@@ -244,6 +244,23 @@ def control_actualidad(h, jd, datos, hoy):
         if m and not (pub == hoy.isoformat()):
             return False, f"{info} → DESCARTADA: lenguaje temporal sin fecha real («{m.group(0)}»)"
     return True, f"{info} → OK" + (f" (verificada {jd['verificada'][11:16]})" if jd.get("verificada") else "")
+
+
+def crear_aviso_pena(datos, hoy, d_datos):
+    """v91: por cada noticia de entradas de VISITANTE (entradas_*.json) se prepara una segunda historia para los peñistas
+    («si quieres que te gestionemos la entrada, contacta con nosotros» + «y si no eres socio, únete»). Copia los datos que el control de actualidad
+    comprueba (noticia, partido, verificación, plazo) y los de estilo (competición, logo, equipos), para que salga con el mismo aspecto."""
+    for fichero in sorted(f for f in list(datos) if re.fullmatch(r"entradas_.+\.json", f)):
+        en = datos[fichero]
+        if not en or not en.get("nombre") or not en.get("visitantes"):
+            continue
+        campos = ("competicion", "logo", "tag", "local", "visitante", "local_nombre", "visitante_nombre", "jornada", "partido_fecha_hora",
+                  "publicada", "verificada", "plazo_fin", "url", "nombre")
+        r = {"tipo": "aviso_pena", **{k: en[k] for k in campos if en.get(k) is not None}}
+        clave = "avisopena_" + fichero[len("entradas_"):]
+        with open(os.path.join(d_datos, clave), "w", encoding="utf-8") as fh:
+            json.dump(r, fh, ensure_ascii=False, indent=1)
+        datos[clave] = r
 
 
 def crear_pronostico(datos, hoy, d_datos):
@@ -494,6 +511,13 @@ def plan(hoy, datos, avisos):
         que = "Entradas para afeccionados visitantes" if en.get("visitantes") else "Entradas dispoñibles"
         add(f"entradas-{en['nombre']}", fichero, "mañana", "canto antes (para avisar aos peñistas)",
             f"🎟️ {que}: {partido}.{primero} Todos os detalles: {en.get('url', 'rccelta.es')} {etiquetas('celta')}")
+        fa = "avisopena_" + fichero[len("entradas_"):]
+        if en.get("visitantes") and fa in datos:                                # v91: segunda historia, para los peñistas (gestión de la entrada) y para quien aún no es socio
+            import generar_historia as HIST
+            tel, mail, web = HIST.CONTACTO_PENA["whatsapp"], HIST.CONTACTO_PENA["email"], HIST.CONTACTO_PENA["web"]
+            add(f"entradas-pena-{en['nombre']}", fa, "mañana", "canto antes (para avisar aos peñistas)",
+                f"📣 Peñistas! Se queredes que vos xestionemos a entrada de visitante para {partido}, escribídenos: WhatsApp {tel} ou {mail}. "
+                f"E se aínda non sodes socios, uníos á peña en {web}! 💙 {etiquetas('celta')}")
         if en.get("visitantes") and en.get("plazo_fin"):                       # v88: recordatorio el día que remata o prazo da pre-reserva (sen «hoxe», polo control de actualidade)
             fin = datetime.datetime.fromisoformat(en["plazo_fin"])
             ahora_m = datetime.datetime.now(MADRID)
@@ -649,6 +673,7 @@ def main():
 
     datos = {f: cargar(os.path.join(d_datos, f)) for f in os.listdir(d_datos) if f.endswith(".json")}
     crear_pronostico(datos, hoy, d_datos)
+    crear_aviso_pena(datos, hoy, d_datos)                                  # v91
     crear_historia(datos, hoy, d_datos, avisos, offline=a.offline, rapido=rapido)
     if not a.offline and not a.sin_estado:
         try:

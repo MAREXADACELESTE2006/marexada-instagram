@@ -1,14 +1,14 @@
 """Marexada Celeste · Celta Femxa Zorka (baloncesto femenino, Liga Femenina Endesa) desde la web de la Federación y BetExplorer (v87).
 
 Como con el AS Celtas Fem, solo se publican DOS cosas: el próximo partido y el resultado (nada de directo, alineación ni convocatoria).
-Lee la página oficial de resultados de la FEB (feb.es/lfendesa/resultados.aspx: marcador, día y hora de la jornada) y, de reserva y para el calendario,
-dos páginas públicas de betexplorer.com del equipo (calendario y resultados). Escribe en datos_reales/ (o en --salida):
+Lee la página oficial de resultados de la FEB (feb.es/lfendesa/resultados.aspx: marcador, día y hora de la jornada), el calendario oficial de la FEB
+(feb.es/competiciones/calendario.aspx: todas las jornadas con día y hora, v89) y, de reserva, dos páginas públicas de betexplorer.com del equipo. Escribe en datos_reales/ (o en --salida):
     proximo_baloncesto_fem.json      (próximo partido)
     resultado_baloncesto_fem.json    (último partido jugado)
 
 Uso:
     python baloncesto.py                                                  (lee internet)
-    python baloncesto.py --calendario a.html --resultados b.html --feb c.html --hoy 2026-11-23 --salida carpeta     (prueba sin internet)
+    python baloncesto.py --calendario a.html --resultados b.html --feb c.html --calendario-feb d.html --hoy 2026-11-23 --salida carpeta     (prueba sin internet)
 Si la página cambia y no se entiende, guarda lo recibido en baloncesto_*_DEBUG.html para poder ajustarlo.
 HORAS: BetExplorer las da en hora de Madrid (a comprobar con el primer partido). Si salieran desplazadas, se corrige sin tocar código
 poniendo la variable BALONCESTO_DESFASE_MIN (minutos, p. ej. 60 o -60) en GitHub → Settings → Variables → Actions.
@@ -26,6 +26,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 URL_CALENDARIO = "https://www.betexplorer.com/basketball/team/celta/pMyy6Tm6/fixtures/"
 URL_RESULTADOS = "https://www.betexplorer.com/basketball/team/celta/pMyy6Tm6/results/"
 URL_FEB = "https://www.feb.es/lfendesa/resultados.aspx"
+URL_FEB_CALENDARIO = "https://www.feb.es/competiciones/calendario.aspx?g=4&t={temporada}&nm=lfendesa"      # v89: calendario oficial de toda la liga (t = año en que empieza la temporada)
 TAG = "CELTA FEMXA ZORKA"
 DIA = ["Lun", "Mar", "Mér", "Xov", "Ven", "Sáb", "Dom"]
 
@@ -152,6 +153,40 @@ def leer_feb(html):
     return out
 
 
+CABECERA_FEB = re.compile(r"Jornada\s*(\d+)\s*(?:<[^>]*>\s*)*(\d{2})/(\d{2})/(\d{4})", re.I)       # «Jornada 9 28/11/2026» (el desplegable lleva «Jornada 9(28/11/2026)» y no vale)
+DIA_FEB = r"(?:LUNES|MARTES|MI[ÉE]RCOLES|JUEVES|VIERNES|S[ÁA]BADO|DOMINGO)"
+FECHA_FEB = re.compile(rf"(?:{DIA_FEB}\s+)?(\d{{1,2}})/(\d{{1,2}})/(\d{{4}})(?:\s+(\d{{1,2}}):(\d{{2}}))?", re.I)
+
+
+def leer_calendario_feb(html):
+    """v89: calendario oficial de la FEB (feb.es/competiciones/calendario.aspx?g=4&t=AAAA&nm=lfendesa) -> partidos POR JUGAR: [{jornada, local, visitante, fecha, hora, puntos=None, origen}].
+    La página tiene una tabla por jornada («Jornada 9 28/11/2026») con tres columnas: Local | Resultado | Visitante. En los partidos por jugar la columna del medio
+    trae el día y la hora («SÁBADO 28/11/2026 16:45»); en los jugados, el marcador («80-84»), que aquí se ignora porque no lleva fecha exacta
+    (los marcadores salen de la página de resultados). Una hora «0:00» significa «sin hora todavía» y se deja sin hora."""
+    html = re.sub(r"(?is)<(script|style)\b.*?</\1>", " ", html)
+    eventos = sorted([(m.start(), "j", m) for m in CABECERA_FEB.finditer(html)] + [(m.start(), "r", m) for m in re.finditer(r"(?is)<tr\b.*?</tr>", html)], key=lambda e: e[0])
+    out, jornada = [], None
+    for _, tipo, m in eventos:
+        if tipo == "j":
+            jornada = int(m.group(1))
+            continue
+        celdas = [limpio(c) for c in re.findall(r"(?is)<t[dh]\b[^>]*>(.*?)</t[dh]>", m.group(0))]
+        if jornada is None or len(celdas) < 3 or norm(celdas[0]) == "local" or not celdas[0] or not celdas[2]:
+            continue
+        mf = FECHA_FEB.search(celdas[1])
+        if not mf or MARCADOR.match(celdas[1]):
+            continue
+        hora = None
+        if mf.group(4) and (int(mf.group(4)), int(mf.group(5))) != (0, 0):
+            hora = f"{int(mf.group(4)):02d}:{mf.group(5)}"
+        try:
+            fecha = datetime.date(int(mf.group(3)), int(mf.group(2)), int(mf.group(1)))
+        except ValueError:
+            continue
+        out.append({"jornada": jornada, "local": celdas[0], "visitante": celdas[2], "fecha": fecha, "hora": hora, "puntos": None, "origen": "feb"})
+    return out
+
+
 def con_desfase(p):
     """Aplica BALONCESTO_DESFASE_MIN (si lo hay) a la hora, por si BetExplorer la diera en otra zona."""
     try:
@@ -186,11 +221,14 @@ def main():
     ap.add_argument("--calendario", default=URL_CALENDARIO)
     ap.add_argument("--resultados", default=URL_RESULTADOS)
     ap.add_argument("--feb", default=URL_FEB)
+    ap.add_argument("--calendario-feb", dest="calendario_feb", default=None, help="calendario oficial de la FEB (por defecto, la web de la temporada en curso)")
     ap.add_argument("--hoy", default=None, help="fecha AAAA-MM-DD (por defecto, hoy)")
     ap.add_argument("--salida", default=os.path.join(BASE, "datos_reales"))
     a = ap.parse_args()
     hoy = datetime.date.fromisoformat(a.hoy) if a.hoy else datetime.date.today()
     os.makedirs(a.salida, exist_ok=True)
+    if not a.calendario_feb:
+        a.calendario_feb = URL_FEB_CALENDARIO.format(temporada=hoy.year if hoy.month >= 8 else hoy.year - 1)
 
     def guardar(nombre, datos):
         ruta = os.path.join(a.salida, nombre)
@@ -209,7 +247,8 @@ def main():
         return ps
 
     todos = []
-    for nombre, fuente, lector, origen in (("feb", a.feb, leer_feb, "feb"), ("calendario", a.calendario, leer_partidos, "bet"), ("resultados", a.resultados, leer_partidos, "bet")):
+    for nombre, fuente, lector, origen in (("feb", a.feb, leer_feb, "feb"), ("calendario_feb", a.calendario_feb, leer_calendario_feb, "feb"),
+                                           ("calendario", a.calendario, leer_partidos, "bet"), ("resultados", a.resultados, leer_partidos, "bet")):
         try:
             todos += [dict(p, origen=origen) for p in partidos_de(nombre, fuente, lector)]
         except ErrorLector as e:
@@ -219,7 +258,10 @@ def main():
     if not todos:
         raise ErrorLector("Ninguna fuente del baloncesto ha dado datos.")
     prefiere_feb = lambda p: 0 if p["origen"] == "feb" else 1         # a igualdad de día, manda la web oficial (hora y marcador)
-    futuros = [p for p in todos if p["puntos"] is None and p["fecha"] >= hoy]
+    jugados_clave = {(p["fecha"], norm(re.sub(r"\s+W$", "", p["local"])), norm(re.sub(r"\s+W$", "", p["visitante"]))) for p in todos if p["puntos"] is not None}
+    futuros = [p for p in todos if p["puntos"] is None and p["fecha"] >= hoy      # v89: un partido que ya tiene marcador en otra fuente no es «el próximo» (el calendario de la FEB tarda días en poner los marcadores)
+               and (p["fecha"], norm(re.sub(r"\s+W$", "", p["local"])), norm(re.sub(r"\s+W$", "", p["visitante"]))) not in jugados_clave]
+    futuros = [p for p in futuros if p["origen"] == "feb"] or futuros               # v89: si la web oficial da calendario, solo se mira ella (BetExplorer queda de reserva)
     if futuros:
         guardar("proximo_baloncesto_fem.json", datos_partido(min(futuros, key=lambda p: (p["fecha"], prefiere_feb(p), p["hora"] or "")), "proximo"))
     else:

@@ -607,7 +607,7 @@ def main():
             ("entradas.py", ["--hoy", hoy.isoformat(), "--desde", fx("entradas_RECONSTRUIDO"), "--salida", d_datos], "Entradas (rccelta.es)"),
             ("cumpleanos.py", ["--hoy", hoy.isoformat(), "--salida", d_datos], "Cumpleaños"),
             ("clasificacion_baloncesto.py", ["--desde", fx("feb_clasificacion_RECONSTRUIDO.html"), "--salida", d_datos], "Clasificación LF Endesa (Federación)"),
-            ("baloncesto.py", ["--feb", fx("feb_resultados_RECONSTRUIDO.html"), "--calendario", fx("betexplorer_baloncesto_calendario_RECONSTRUIDO.html"), "--resultados", fx("betexplorer_baloncesto_resultados_RECONSTRUIDO.html"), "--hoy", hoy.isoformat(), "--salida", d_datos], "Celta Femxa Zorka (prueba)"),
+            ("baloncesto.py", ["--feb", fx("feb_resultados_RECONSTRUIDO.html"), "--calendario-feb", fx("feb_calendario_RECONSTRUIDO.html"), "--calendario", fx("betexplorer_baloncesto_calendario_RECONSTRUIDO.html"), "--resultados", fx("betexplorer_baloncesto_resultados_RECONSTRUIDO.html"), "--hoy", hoy.isoformat(), "--salida", d_datos], "Celta Femxa Zorka (prueba)"),
         ]
     else:
         ahora = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")

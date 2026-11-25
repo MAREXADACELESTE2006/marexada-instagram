@@ -217,7 +217,8 @@ def control_actualidad(h, jd, datos, hoy):
     evento = (jd.get("partido_fecha_hora") or "")[:10] or None
     info = (f"noticia {pub[8:10] + '/' + pub[5:7] if pub else '—'} · partido {evento[8:10] + '/' + evento[5:7] if evento else '—'}"
             if (pub or evento) else "dato de estado (sin fecha de noticia)")
-    if pub and (hoy - datetime.date.fromisoformat(pub)).days > MAX_DIAS_NOTICIA:
+    plazo_vigente = bool(jd.get("plazo_fin")) and datetime.date.fromisoformat(jd["plazo_fin"][:10]) >= hoy                 # v88: pre-reserva de entradas de visitante todavía abierta
+    if pub and (hoy - datetime.date.fromisoformat(pub)).days > MAX_DIAS_NOTICIA and not plazo_vigente:
         return False, f"{info} → DESCARTADA: noticia de hace {(hoy - datetime.date.fromisoformat(pub)).days} días"
     if jd.get("tipo") == "entradas":
         if not evento:                                           # sin fecha en la noticia: se contrasta con el calendario oficial
@@ -493,6 +494,12 @@ def plan(hoy, datos, avisos):
         que = "Entradas para afeccionados visitantes" if en.get("visitantes") else "Entradas dispoñibles"
         add(f"entradas-{en['nombre']}", fichero, "mañana", "canto antes (para avisar aos peñistas)",
             f"🎟️ {que}: {partido}.{primero} Todos os detalles: {en.get('url', 'rccelta.es')} {etiquetas('celta')}")
+        if en.get("visitantes") and en.get("plazo_fin"):                       # v88: recordatorio el día que remata o prazo da pre-reserva (sen «hoxe», polo control de actualidade)
+            fin = datetime.datetime.fromisoformat(en["plazo_fin"])
+            ahora_m = datetime.datetime.now(MADRID)
+            if fin.date() == hoy and (hoy != ahora_m.date() or ahora_m.replace(tzinfo=None) < fin):
+                add(f"entradas-ultimas-{en['nombre']}", fichero, "mañana", "10:00",
+                    f"⏰ Remata a pre-reserva de entradas para {partido}: ata o {fin.strftime('%d/%m')} ás {fin.strftime('%H:%M')} h no Portal do Celtista. {en.get('url', 'rccelta.es')} {etiquetas('celta')}")
 
     # Cumpleaños: una historia por cada jugador o miembro del cuerpo técnico que cumple años hoy (datos en cumpleanos.json).
     for fichero in sorted(f for f in datos if re.fullmatch(r"cumpleanos_.+\.json", f)):
@@ -553,6 +560,8 @@ def ventana_instagram(h, t=None):
         hasta = desde + datetime.timedelta(minutes=45)
     elif c.startswith("alineacion-"):
         hasta = desde + datetime.timedelta(minutes=90)             # v85: la alineación solo vale justo antes del partido
+    elif c.startswith("entradas-ultimas-"):
+        hasta = desde + datetime.timedelta(hours=2)                # v88: el recordatorio del último día solo vale a primera hora
     elif c.startswith(("resultado-", "cronica-")):
         hasta = desde + datetime.timedelta(hours=8)
     elif c.startswith("convocatoria-"):

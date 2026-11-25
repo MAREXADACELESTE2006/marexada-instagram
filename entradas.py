@@ -35,13 +35,15 @@ LISTAS = [RAIZ + "/club/actualidad/", RAIZ + "/gl/club/actualidad/"]
 MAPAS = [RAIZ + "/wp-sitemap.xml", RAIZ + "/sitemap_index.xml", RAIZ + "/sitemap.xml"]
 ENLACE = re.compile(r'(?:https?://rccelta\.es)?/(?:(?:gl|en)/)?club/actualidad/([a-z0-9][a-z0-9-]+)/?', re.I)
 ENTRADA = re.compile(r"entrada", re.I)
+CANDIDATA = re.compile(r"entrada|acompa[ñn]a|desplaza|viaja|visita-?al|visita-?a-?la|en-su-visita", re.I)       # v88: nombres que pueden ser de entradas visitantes
+TICKETS = re.compile(r"pre-?\s?reserva|pre-?\s?inscripci[oó]n|Portal (?:del )?Celtista|grada visitante|localidades|a la venta", re.I)
 EXCLUIR = re.compile(r"as-?celtas|femenin|canteira|juvenil|cadete|infantil|alev[ií]n|benjam[ií]n|abono|abonad", re.I)
 MESES = {"enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6, "julio": 7, "agosto": 8, "septiembre": 9, "setiembre": 9,
          "octubre": 10, "noviembre": 11, "diciembre": 12, "xaneiro": 1, "febreiro": 2, "maio": 5, "xuño": 6, "xullo": 7, "setembro": 9,
          "outubro": 10, "novembro": 11, "decembro": 12, "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6, "july": 7,
          "september": 9, "october": 10, "november": 11, "december": 12}
 DIAS = "lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo"
-FECHA_HORA = re.compile(rf"\b({DIAS})\s+(\d{{1,2}})\s+de\s+([a-zñáéíóú]+)\s+a\s+las\s+(\d{{1,2}})[:.](\d{{2}})", re.I)
+FECHA_HORA = re.compile(rf"\b(?:({DIAS})\s+)?(\d{{1,2}})\s+de\s+([a-zñáéíóú]+),?\s+a\s+las\s+(\d{{1,2}})[:.](\d{{2}})", re.I)        # v88: el día de la semana es opcional
 FECHA_NOTICIA = re.compile(r"^RC Celta\s+(\d{1,2})[-/ ]([A-Za-zñáéíóú]+)[-/ ](\d{4})", re.I)
 CLAVES = re.compile(r"euros|€|prioridad|canje|carn[eé]|suplemento|a la venta|venta|localidades|entrada gratuita|abonad", re.I)
 FIN_TEXTO = re.compile(r"^(etiquetas|noticias recomendadas|tags|s[ií]guenos)", re.I)
@@ -235,7 +237,7 @@ def absolutiza(frase, publicada):
 def _competicion(titulo, intro, fortuna):
     """(logo, competicion) a partir del título y de las primeras frases de la noticia."""
     t = titulo + " " + intro
-    if re.search(r"europa league|uefa", t, re.I):
+    if re.search(r"europa league|uefa|competici[oó]n (?:continental|europea)|desplazamientos? europeos?", t, re.I):
         return "europa", "europa"
     if re.search(r"copa del rey", t, re.I):
         return "copa", "liga"
@@ -252,6 +254,58 @@ def _lado(nombre_equipo):
     return n, rccelta.slug_equipo(n)
 
 
+EXONIMOS = {"marsella": "marseille", "oporto": "porto", "bolonia": "bologna", "lila": "lille", "niza": "nice", "basilea": "basel", "mónaco": "monaco", "génova": "genoa", "nápoles": "napoli"}
+_NOM = (r"((?:[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ\'’-]*|[A-Z]{2,}\d*)(?:\s+(?:(?:de|del|la|las|los|do|da|y|&|el)\s+)?[A-ZÁÉÍÓÚÑ0-9][\wÁÉÍÓÚÑáéíóúñ\'’-]*){0,3})")
+_NO_RIVAL = re.compile(r"camp nou|estadio|stade|portal|[áa]rea|balaídos|vélodrome|velodrome|tartiere|carné|celtista|anfield|^celta\b", re.I)
+
+
+def _rival(texto, titulo):
+    """Nombre del equipo contrario a partir del texto («frente al Olympique de Marsella», «medirse al FC Barcelona») o, si no, del título («ante el Marsella»)."""
+    for fuente in (texto, titulo):
+        for cabeza in (r"(?i:frente\s+(?:a|al|a\s+la))", r"(?i:medirse\s+(?:a|al|a\s+la|con\s+el|con))", r"(?i:enfrentarse\s+(?:a|al|a\s+la))",
+                       r"(?i:ante\s+(?:el|la|los|las))", r"(?i:contra\s+(?:el|la|los|las))", r"(?i:rival(?:es)?\s*[:,]?\s*(?:el|la)?)", r"(?i:visita\s+(?:al|a\s+la))"):
+            for m in re.finditer(cabeza + r"\s+" + _NOM, fuente):
+                n = m.group(1).strip().rstrip(".,;:")
+                if n and not _NO_RIVAL.search(n):
+                    return n
+    return None
+
+
+def _equipo_es(n):
+    """Nombre castellano de un club extranjero -> el que usa equipos.json (Marsella -> Marseille)."""
+    for k, v in EXONIMOS.items():
+        n = re.sub(rf"\b{k}\b", v, n, flags=re.I)
+    return n
+
+
+def _hasta(texto, anio):
+    """(datetime, texto gallego) del final del plazo de pre-reserva / pre-inscripción, o (None, None)."""
+    m = re.search(rf"(?:pre-?\s?(?:reserva|inscripci[oó]n)|inscripci[oó]n|solicitud)[^.]{{0,260}}?hasta\s+(?:el\s+)?(?:({DIAS})\s+)?(\d{{1,2}})\s+de\s+([a-zñáéíóú]+)(?:,?\s+a\s+las\s+(\d{{1,2}})[:.](\d{{2}}))?", texto, re.I)
+    if not m or m.group(3).lower() not in MESES:
+        return None, None
+    h, mi = (int(m.group(4)), int(m.group(5))) if m.group(4) else (23, 59)
+    d = datetime.datetime(anio, MESES[m.group(3).lower()], int(m.group(2)), h, mi)
+    return d, f"{_fecha_gl(d.date())}" + (f" ás {h:02d}:{mi:02d} h" if m.group(4) else "")
+
+
+def _proceso_visitante(texto, anio):
+    """Puntos (en gallego) y fin del plazo de una noticia de entradas de visitante: pre-reserva, prezo, reparto."""
+    fin, cuando = _hasta(texto, anio)
+    pp = []
+    if cuando:
+        imp = re.search(r"pre-?\s?reserva\s*\(\s*(\d+(?:[.,]\d+)?)\s*(?:euros|€)", texto, re.I)
+        pp.append(f"Pre-reserva ata o {cuando}" + (f" · {imp.group(1)} € (devólvense se non te seleccionan)" if imp and re.search(r"devolver|reembols", texto, re.I) else ""))
+    precio = re.search(r"grada visitante\s*\(\s*(\d+(?:[.,]\d+)?)\s*(?:euros|€)", texto, re.I) or re.search(r"(?:precio|importe)[^.]{0,40}?(\d+(?:[.,]\d+)?)\s*(?:euros|€)", texto, re.I)
+    loc = re.search(r"(\d[\d.]*)\s+localidades", texto, re.I)
+    if precio or loc:
+        pp.append("Entrada de visitante" + (f": {precio.group(1)} €" if precio else "") + (f" · {loc.group(1)} localidades" if loc else ""))
+    a1 = re.search(r"(\d+)\s*%[^.]{0,160}?antig[uü]edad", texto, re.I)
+    a2 = re.search(r"(\d+)\s*%[^.]{0,160}?sorteo", texto, re.I)
+    if a1 and a2:
+        pp.append(f"Adxudicación: {a1.group(1)} % por antigüidade e {a2.group(1)} % por sorteo")
+    return pp, fin
+
+
 def articulo(html, nombre, hoy):
     """Lee una noticia. Devuelve un diccionario o None si no es de entradas de Celta/Fortuna."""
     titulo = _meta(html, "og:title") or ""
@@ -259,7 +313,7 @@ def articulo(html, nombre, hoy):
     if not titulo:
         titulo = next((l for l in lineas if len(l) > 15), "")
     titulo = re.sub(r"\s*\|\s*Celta\s*$", "", titulo).strip()
-    if not ENTRADA.search(titulo + " " + nombre) or EXCLUIR.search(nombre + " " + titulo):
+    if not CANDIDATA.search(titulo + " " + nombre) or EXCLUIR.search(nombre + " " + titulo):
         return None
     partes = [p.strip() for p in titulo.split("|")]
     partido = next((p for p in partes if re.search(r"\bcelta\b", p, re.I) and re.search(r"\s[-–—]\s", p)), None)
@@ -278,6 +332,8 @@ def articulo(html, nombre, hoy):
     parrafos = [t for e, t in cuerpo if not e.startswith("h") and len(t) > 25]
     texto = _limpia(" ".join(parrafos))
     frases = [f.strip() for f in re.split(r"(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚ¡¿0-9])", texto) if len(f.strip()) > 25]
+    if not ENTRADA.search(titulo + " " + nombre) and not (re.search(r"entradas?\b", texto, re.I) and TICKETS.search(texto)):
+        return None                                               # v88: «Acompaña al Celta…» solo vale si el texto habla de entradas
     partido_dt, anio = None, (fecha or hoy).year
     for estricto in (True, False):                               # 1º frases que hablan del partido; 2º cualquier fecha que no sea de venta
         for f in frases[:8]:
@@ -314,6 +370,18 @@ def articulo(html, nombre, hoy):
             f2 = absolutiza(f, fecha)
             if f2 and len(puntos) < 3 and _corta(f2, 150) not in puntos:
                 puntos.append(_corta(f2, 150))
+    fortuna = bool(re.search(r"fortuna", nombre + titulo, re.I))
+    visitante_marcas = bool(re.search(r"grada visitante|entradas? visitante|desplazamiento|viajar[aá]|en su visita|visita al|acompa[ñn]a", nombre + " " + titulo + " " + texto, re.I))
+    plazo_fin = None
+    if visitante_marcas:                                             # v88: noticias del tipo «el Celta abre el proceso de solicitud de entradas…»
+        pv, plazo_fin = _proceso_visitante(texto, anio)
+        if pv:
+            puntos = pv
+    if not partido:
+        rival = _rival(texto, titulo)
+        if rival:
+            mio = "Celta Fortuna" if fortuna else "Celta"
+            partido = f"{rival} - {mio}" if visitante_marcas else f"{mio} - {rival}"
     if not (partido or puntos):
         return None
     lado = {}
@@ -321,6 +389,10 @@ def articulo(html, nombre, hoy):
         pp = re.split(r"\s+[-–—]\s+", partido, maxsplit=1)
         if len(pp) == 2:
             (ln, ls), (vn, vs) = _lado(pp[0]), _lado(pp[1])
+            if not re.search(r"celta", pp[0], re.I):                  # club extranjero: el escudo se busca con su nombre en equipos.json (Marsella -> Marseille)
+                ls = rccelta.slug_equipo(_equipo_es(pp[0]))
+            if not re.search(r"celta", pp[1], re.I):
+                vs = rccelta.slug_equipo(_equipo_es(pp[1]))
             lado = {"local": ls, "visitante": vs, "local_nombre": ln, "visitante_nombre": vn}
             fuera = bool(re.search(r"celta", vn, re.I)) and not re.search(r"celta", ln, re.I)
             lado["visitantes"] = fuera or bool(re.search(r"visitante|desplazamiento", nombre + " " + titulo, re.I))
@@ -330,6 +402,7 @@ def articulo(html, nombre, hoy):
             "partido_fecha_hora": partido_dt.strftime("%Y-%m-%dT%H:%M") if partido_dt else None,
             "jornada": int(jornada.group(1)) if jornada else None, "torneo": competicion.group(1) if competicion else None,
             "intro": _corta(frases[0], 220) if frases else "", "puntos": puntos[:3],
+            "plazo_fin": plazo_fin.strftime("%Y-%m-%dT%H:%M") if plazo_fin else None,
             "modificada": _meta(html, "article:modified_time"), "verificada": datetime.datetime.now().isoformat(timespec="minutes")}
 
 
@@ -345,7 +418,7 @@ def main():
     os.makedirs(a.salida, exist_ok=True)
     traza = []
     lista, respondieron = descubrir(a.desde, traza)
-    candidatas = [(n, u) for n, u in lista if ENTRADA.search(n) and not EXCLUIR.search(n)]
+    candidatas = [(n, u) for n, u in lista if CANDIDATA.search(n) and not EXCLUIR.search(n)]
     traza.append(f"candidatas por el nombre: {len(candidatas)} de {len(lista)} enlaces")
     leidas, noticias, revisadas, control = set(), [], 0, []
     cola = candidatas[:10]
@@ -362,13 +435,14 @@ def main():
             continue
         for m in ENLACE.finditer(html):                       # «Noticias recomendadas»: puede haber otra noticia de entradas
             n2 = m.group(1).lower()
-            if ENTRADA.search(n2) and not EXCLUIR.search(n2) and n2 not in leidas and (n2, RAIZ + "/club/actualidad/" + n2 + "/") not in cola and revisadas < 12:
+            if CANDIDATA.search(n2) and not EXCLUIR.search(n2) and n2 not in leidas and (n2, RAIZ + "/club/actualidad/" + n2 + "/") not in cola and revisadas < 12:
                 cola.append((n2, RAIZ + "/club/actualidad/" + n2 + "/"))
         d = articulo(html, nombre, hoy)
         if not d:
             continue
         c = {"noticia": nombre, "publicada": d["publicada"], "partido": d["partido"], "evento": (d["partido_fecha_hora"] or "")[:10] or None}
-        if d["publicada"] and (hoy - datetime.date.fromisoformat(d["publicada"])).days > a.dias:
+        plazo_vigente = bool(d.get("plazo_fin")) and datetime.datetime.fromisoformat(d["plazo_fin"]).date() >= hoy            # v88: mientras dure la pre-reserva la noticia sigue vigente
+        if d["publicada"] and (hoy - datetime.date.fromisoformat(d["publicada"])).days > a.dias and not plazo_vigente:
             control.append({**c, "decision": "DESCARTADA", "motivo": f"noticia de hace {(hoy - datetime.date.fromisoformat(d['publicada'])).days} días (solo se avisa de las de los últimos {a.dias})"})
             continue
         if d["partido_fecha_hora"] and datetime.datetime.fromisoformat(d["partido_fecha_hora"]).date() < hoy:

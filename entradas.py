@@ -26,6 +26,8 @@ import urllib.parse
 import urllib.request
 from html.parser import HTMLParser
 
+PENA_DIAS_DESPUES = 1        # v96/v98: la peña cierra la gestión de entradas de visitante este nº de días DESPUÉS de que cierre la pre-reserva del club (para quien no resulta seleccionado por el club); sale en la imagen de entradas
+
 import partemedico as pm                                  # reutiliza el conversor HTML -> líneas de texto
 import rccelta                                            # nombre de equipo -> escudo
 

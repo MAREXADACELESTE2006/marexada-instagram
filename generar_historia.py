@@ -1236,17 +1236,63 @@ def efemeride(datos):
 
 
 # ---------------------------------------------------------------- entradas a la venta
+def _ultimas_horas(img, datos, y):
+    """v94: el día que remata la pre-reserva, en vez de los puntos 1-2-3: un bloque con «ÚLTIMAS HORAS» y la hora de cierre MUY visible. Devuelve el final del bloque."""
+    fin = datetime.datetime.fromisoformat(datos["plazo_fin"])
+    hora = "ATA A MEIANOITE" if (fin.hour, fin.minute) in ((0, 0), (23, 59)) else f"ÁS {fin:%H:%M} H"
+    alto = 252
+    cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(cap).rounded_rectangle([40, y, W - 40, y + alto], 18, fill=(255, 255, 255, 34), outline=AZUL + (255,), width=4)
+    img.paste(cap, (0, 0), cap)
+    d = ImageDraw.Draw(img)
+    _esp(d, W // 2, y + 18, "ÚLTIMAS HORAS", font(42), AZUL, 9)
+    t = "A PRE-RESERVA PECHA HOXE"
+    center(d, y + 74, t, fit(d, t, 52, W - 120, 30), fill=WHITE)
+    center(d, y + 122, hora, fit(d, hora, 104, W - 120, 60), fill=AZUL)
+    return y + alto
+
+
+def _bloque_pena(img, y, datos):
+    """v98: bloque de la peña dentro de la imagen del club: «Se non che toca polo club, ponte en contacto connosco» + WhatsApp, correo y la fecha hasta la que
+    la peña gestiona la entrada (un día después del cierre del club). Tarjeta con borde de acento, para que se vea. Devuelve el final del bloque."""
+    wa = datos.get("whatsapp", CONTACTO_PENA["whatsapp"])
+    mail = datos.get("email", CONTACTO_PENA["email"])
+    dia = None
+    if datos.get("plazo_pena"):
+        dp = datetime.date.fromisoformat(datos["plazo_pena"][:10])
+        dia = f"{['luns', 'martes', 'mércores', 'xoves', 'venres', 'sábado', 'domingo'][dp.weekday()]} {dp.day:02d}/{dp.month:02d}"
+    alto = 150
+    cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(cap).rounded_rectangle([40, y, W - 40, y + alto], 16, fill=(255, 255, 255, 34), outline=AZUL + (255,), width=4)
+    img.paste(cap, (0, 0), cap)
+    d = ImageDraw.Draw(img)
+    cx, cyp = 98, y + alto // 2
+    d.ellipse([cx - 36, cyp - 36, cx + 36, cyp + 36], fill=AZUL)
+    _icono(img, cx, cyp, 56, _dib_whatsapp(OSCURO_AVISO))
+    d = ImageDraw.Draw(img)
+    l1 = "Se non che toca polo club, ponte en contacto connosco"
+    d.text((155, y + 18), l1, font=fit(d, l1, 31, W - 155 - 66, 22), fill=WHITE)
+    l2 = f"WhatsApp {wa}  ·  {mail}"
+    d.text((155, y + 62), l2, font=fit(d, l2, 28, W - 155 - 66, 18), fill=AZUL)
+    if dia:
+        l3 = f"Prazo na peña: ata o {dia}"
+        d.text((155, y + 104), l3, font=fit(d, l3, 28, W - 155 - 66, 20), fill=(200, 218, 240))
+    return y + alto
+
+
 def entradas(datos):
     img = fondo(); d = ImageDraw.Draw(img)
-    titulo = "ENTRADAS VISITANTES" if datos.get("visitantes") else "ENTRADAS"
-    cabecera(img, d, "" if datos.get("visitantes") else datos.get("tag", ""), titulo, None, ytitulo=205)
-    if datos.get("visitantes"):
+    visit = bool(datos.get("visitantes"))
+    titulo = "ENTRADAS VISITANTES" if visit else "ENTRADAS"
+    cabecera(img, d, "" if visit else datos.get("tag", ""), titulo, None, ytitulo=205)
+    if visit:
         _cabecera_aviso(img, 140)                           # v91/v92: en vez de «REAL CLUB CELTA», una campana de alarma y «AVISO»
         d = ImageDraw.Draw(img)
     logo = datos.get("logo")
+    tl = 160 if visit else 190                              # v98: en las de visitante se compacta la parte de arriba para que quepa el bloque de la peña
     if logo in LOGOS and os.path.exists(os.path.join(ASSETS, "marca", LOGOS[logo])):
-        pegar(img, os.path.join(ASSETS, "marca", LOGOS[logo]), 445, 322, (190, 190))
-    cy = 705
+        pegar(img, os.path.join(ASSETS, "marca", LOGOS[logo]), (W - tl) // 2, 320 if visit else 322, (tl, tl))
+    cy = 628 if visit else 705
     if datos.get("local_nombre") and datos.get("visitante_nombre"):
         escudo(img, 215, cy, datos.get("local"), siglas(datos["local_nombre"]))
         escudo(img, 865, cy, datos.get("visitante"), siglas(datos["visitante_nombre"]))
@@ -1265,22 +1311,31 @@ def entradas(datos):
         dias = ["luns", "martes", "mércores", "xoves", "venres", "sábado", "domingo"]
         cad = f"{dias[dt.weekday()].capitalize()} {dt.day:02d}/{dt.month:02d} · {dt:%H:%M} h"
         center(d, y, cad, fit(d, cad, 52, W - 100, 30), fill=AZUL); y += 80
-    y = max(y + 10, 1150)
-    fd = font_m(31)
-    for i, texto in enumerate(datos.get("puntos", [])[:3], 1):
+    y = y + 6 if visit else max(y + 10, 1150)
+    puntos = datos.get("puntos", [])[:3]
+    if datos.get("ultimas") and datos.get("plazo_fin"):
+        y = _ultimas_horas(img, datos, y) + 14
+        puntos = []
+    alto_p, paso = (92, 104) if visit else (118, 134)
+    fd = font_m(29 if visit else 31)
+    for i, texto in enumerate(puntos, 1):
         cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        ImageDraw.Draw(cap).rounded_rectangle([40, y, W - 40, y + 118], 14, fill=(255, 255, 255, 30))
+        ImageDraw.Draw(cap).rounded_rectangle([40, y, W - 40, y + alto_p], 14, fill=(255, 255, 255, 30))
         img.paste(cap, (0, 0), cap)
         d = ImageDraw.Draw(img)
-        cx, cyp = 98, y + 59
+        cx, cyp = 98, y + alto_p // 2
         d.ellipse([cx - 30, cyp - 30, cx + 30, cyp + 30], fill=AZUL)
         center(d, cyp - 25, str(i), font(38), fill=(10, 35, 57), x=cx)
         lineas = _lineas(d, texto, fd, 830, 2)
-        yy = cyp - (len(lineas) * 38) // 2
+        paso_l = 34 if visit else 38
+        yy = cyp - (len(lineas) * paso_l) // 2
         for l in lineas:
             d.text((155, yy), l, font=fd, fill=WHITE)
-            yy += 38
-        y += 134
+            yy += paso_l
+        y += paso
+    if visit:
+        _bloque_pena(img, y + (0 if puntos else 0), datos)          # v98: «Se non che toca polo club, ponte en contacto connosco»
+    d = ImageDraw.Draw(img)
     pie(img, d)
     return img
 
@@ -2208,14 +2263,18 @@ def _dib_alarma(c):
     return f
 
 
-def _cabecera_aviso(img, cy=140):
+def _cabecera_aviso(img, cy=140, texto="AVISO", icono=True):
     """Sustituye al «REAL CLUB CELTA» de arriba en las entradas de visitante: una campana de alarma y «A V I S O» en ámbar,
-    con la misma tipografía que el resto de la cabecera y dos líneas finas a los lados (sin pastillas ni halos)."""
+    con la misma tipografía que el resto de la cabecera y dos líneas finas a los lados (sin pastillas ni halos).
+    v96: también vale solo con texto (icono=False) para la publicación de «hazte socio/a»."""
     d = ImageDraw.Draw(img)
-    f, esp = font(50), 12
-    letras = "AVISO"
-    tw = sum(d.textlength(c, font=f) for c in letras) + esp * (len(letras) - 1)
-    bell, hueco = 74, 24
+    esp = 12 if icono else 8
+    tam = 50
+    while tam > 30 and sum(d.textlength(c, font=font(tam)) for c in texto) + esp * (len(texto) - 1) > W - 300 - (110 if icono else 0):
+        tam -= 2
+    f = font(tam)
+    tw = sum(d.textlength(c, font=f) for c in texto) + esp * (len(texto) - 1)
+    bell, hueco = (74, 24) if icono else (0, 0)
     total = bell + hueco + tw
     x0 = (W - total) / 2
     lin = Image.new("RGBA", (W, 12), (0, 0, 0, 0))
@@ -2223,10 +2282,11 @@ def _cabecera_aviso(img, cy=140):
     ld.line([(70, 6), (x0 - 34, 6)], fill=AMBAR + (170,), width=3)
     ld.line([(x0 + total + 34, 6), (W - 70, 6)], fill=AMBAR + (170,), width=3)
     img.paste(lin, (0, cy - 6), lin)
-    _icono(img, x0 + bell / 2, cy, bell, _dib_alarma(AMBAR))
+    if icono:
+        _icono(img, x0 + bell / 2, cy, bell, _dib_alarma(AMBAR))
     d = ImageDraw.Draw(img)
     x = x0 + bell + hueco
-    for c in letras:
+    for c in texto:
         d.text((x, cy - f.size * 0.70), c, font=f, fill=AMBAR)
         x += d.textlength(c, font=f) + esp
 
@@ -2246,50 +2306,5 @@ def _dib_sobre(c, fondo_c):
     return f
 
 
-def aviso_pena(datos):
-    """Segunda historia de las entradas de visitante: mensaje para peñistas (gestión de la entrada) y para quien aún no es socio.
-    Mismo lenguaje visual que el resto (cabecera con AVISO, tarjeta translúcida, círculos de acento, tipografía de siempre)."""
-    img = fondo(); d = ImageDraw.Draw(img)
-    cabecera(img, d, "", "ENTRADAS VISITANTES", None, ytitulo=205)
-    _cabecera_aviso(img, 140)
-    d = ImageDraw.Draw(img)
-    claro = (200, 218, 240)
-    if datos.get("local_nombre") and datos.get("visitante_nombre"):
-        t = f"{datos['local_nombre']} - {datos['visitante_nombre']}"
-        center(d, 318, t, fit(d, t, 44, W - 120, 26), fill=AZUL)
-    # ---- mensaje para peñistas
-    _esp(d, W // 2, 440, "PARA PEÑISTAS", font_m(36), AZUL, 10)
-    y = 508
-    for l in ("QUERES QUE CHE", "XESTIONEMOS A ENTRADA", "DE VISITANTE?"):
-        center(d, y, l, fit(d, l, 74, W - 140, 40), fill=WHITE); y += 88
-    d.rounded_rectangle([W // 2 - 60, y + 14, W // 2 + 60, y + 18], 2, fill=AZUL)
-    center(d, y + 46, "Ponte en contacto connosco", fit(d, "Ponte en contacto connosco", 44, W - 140, 30), fill=claro)
-    # ---- datos de contacto: tarjeta translúcida con dos filas (como los puntos 1, 2, 3 de las entradas)
-    py = y + 150
-    alto_fila = 118
-    cap = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    cd = ImageDraw.Draw(cap)
-    cd.rounded_rectangle([40, py, W - 40, py + alto_fila * 2], 16, fill=(255, 255, 255, 30))
-    cd.line([(150, py + alto_fila), (W - 70, py + alto_fila)], fill=(255, 255, 255, 60), width=2)
-    img.paste(cap, (0, 0), cap)
-    filas = ((_dib_whatsapp(OSCURO_AVISO), "WhatsApp", datos.get("whatsapp", CONTACTO_PENA["whatsapp"])),
-             (_dib_sobre(OSCURO_AVISO, AZUL), "Correo electrónico", datos.get("email", CONTACTO_PENA["email"])))
-    for i, (icono, etiqueta, valor) in enumerate(filas):
-        cy = py + alto_fila * i + alto_fila // 2
-        d = ImageDraw.Draw(img)
-        d.ellipse([98 - 38, cy - 38, 98 + 38, cy + 38], fill=AZUL)
-        _icono(img, 98, cy, 62, icono)
-        d = ImageDraw.Draw(img)
-        d.text((165, cy - 40), etiqueta, font=font_m(26), fill=claro)
-        d.text((165, cy - 8), valor, font=fit(d, valor, 46, W - 165 - 100, 28), fill=WHITE)
-    # ---- si no eres socio
-    y = py + alto_fila * 2 + 96
-    _esp(d, W // 2, y, "E SE AÍNDA NON ES SOCIO/A?", font_m(34), claro, 6)
-    center(d, y + 56, "ÚNETE Á PEÑA!", fit(d, "ÚNETE Á PEÑA!", 112, W - 120, 60), fill=AZUL)
-    center(d, y + 196, "Prioridade nas entradas de visitante,", font_m(33), fill=WHITE)
-    center(d, y + 238, "sorteos, viaxes, descontos e moito máis", font_m(33), fill=WHITE)
-    pie(img, ImageDraw.Draw(img))
-    return img
 
-
-RENDER = {"gol": gol, "tarjeta": gol, "penalti_parado": gol, "historia_portada": historia_portada, "almanaque": almanaque, "pronostico": pronostico, "efemeride": efemeride, "cumpleanos": cumpleanos, "entradas": entradas, "partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion, "aviso_pena": aviso_pena}
+RENDER = {"gol": gol, "tarjeta": gol, "penalti_parado": gol, "historia_portada": historia_portada, "almanaque": almanaque, "pronostico": pronostico, "efemeride": efemeride, "cumpleanos": cumpleanos, "entradas": entradas, "partemedico": partemedico, "previa": previa, "clasificacion": clasificacion, "proximo": proximo, "resultado": resultado, "convocatoria": convocatoria, "alineacion": alineacion}

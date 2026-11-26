@@ -14,6 +14,7 @@ Uso:
 Opciones: --forzar (ignora lo ya generado), --sin-estado (no actualiza estado/publicado.json), --sin-telegram.
 """
 import caras
+from entradas import PENA_DIAS_DESPUES              # v96: la peña cierra un día DESPUÉS que el club (se cambia en entradas.py)
 import argparse
 import datetime
 import json
@@ -43,6 +44,22 @@ AGENDA = os.path.join(BASE, "estado", "agenda.json")           # fechas de los p
 RAPIDAS = {"calendario.py", "noticias.py", "resultados.py", "futbolme.py", "baloncesto.py", "besoccer.py", "directo.py", "alineacion.py"}     # fuentes del modo rápido: convocatorias y resultados
 CLAVES_RAPIDAS = ("convocatoria-", "cronica-", "resultado-", "inicio-", "descanso-", "gol-", "alineacion-", "tarjeta-", "penalti-parado-")
 HASHTAGS = "#RCCelta #Celta #MarexadaCeleste"
+HIST_TEL = "623 785 395"        # WhatsApp de la peña (el mismo que CONTACTO_PENA en generar_historia.py)
+DIAS_GL = ["luns", "martes", "mércores", "xoves", "venres", "sábado", "domingo"]
+
+
+def dia_gl(f):
+    """«mércores 25/11»"""
+    return f"{DIAS_GL[f.weekday()]} {f.day:02d}/{f.month:02d}"
+
+
+def cierre_pena(en):
+    """Fecha en la que la peña cierra la gestión de la entrada de visitante (el cierre del club más PENA_DIAS_DESPUES días: es para quien no resulta
+    seleccionado por el club), o None si el club no da plazo."""
+    try:
+        return datetime.datetime.fromisoformat(en["plazo_fin"]).date() + datetime.timedelta(days=PENA_DIAS_DESPUES) if en.get("plazo_fin") else None
+    except (ValueError, TypeError):
+        return None
 
 RECORDATORIOS = {
     0: ["Noticia do día (mañá, de rccelta.es)"],
@@ -204,7 +221,7 @@ def etiquetas(nombre):
 
 # ---------------------------------------------------------------- control de actualidad (obligatorio antes de generar una imagen)
 MAX_DIAS_NOTICIA = 2
-CONTROLADOS = {"entradas", "aviso_pena", "partemedico", "cumpleanos", "pronostico"}                 # historias basadas en noticias o datos que pueden quedarse viejos
+CONTROLADOS = {"entradas", "partemedico", "cumpleanos", "pronostico"}                 # historias basadas en noticias o datos que pueden quedarse viejos
 RELATIVOS = re.compile(r"\b(hoy|hoxe|ma[ñn][aá]n?a|ma[ñn]á|ayer|onte|ahora mismo|[uú]ltimas? horas?|esta (?:tarde|noche|semana)|este fin de semana|"
                        r"en breve|dende hoxe|desde hoy)\b", re.I)
 
@@ -220,7 +237,7 @@ def control_actualidad(h, jd, datos, hoy):
     plazo_vigente = bool(jd.get("plazo_fin")) and datetime.date.fromisoformat(jd["plazo_fin"][:10]) >= hoy                 # v88: pre-reserva de entradas de visitante todavía abierta
     if pub and (hoy - datetime.date.fromisoformat(pub)).days > MAX_DIAS_NOTICIA and not plazo_vigente:
         return False, f"{info} → DESCARTADA: noticia de hace {(hoy - datetime.date.fromisoformat(pub)).days} días"
-    if jd.get("tipo") in ("entradas", "aviso_pena"):
+    if jd.get("tipo") == "entradas":
         if not evento:                                           # sin fecha en la noticia: se contrasta con el calendario oficial
             rival = {jd.get("local"), jd.get("visitante")} - {"celta-vigo", None}
             for f in ("proximo_celta.json", "proximo_fortuna.json"):
@@ -247,20 +264,28 @@ def control_actualidad(h, jd, datos, hoy):
 
 
 def crear_aviso_pena(datos, hoy, d_datos):
-    """v91: por cada noticia de entradas de VISITANTE (entradas_*.json) se prepara una segunda historia para los peñistas
-    («si quieres que te gestionemos la entrada, contacta con nosotros» + «y si no eres socio, únete»). Copia los datos que el control de actualidad
-    comprueba (noticia, partido, verificación, plazo) y los de estilo (competición, logo, equipos), para que salga con el mismo aspecto."""
+    """v98: una sola imagen de entradas de VISITANTE (la del club, con sus datos y escudos). Si la noticia da plazo, se apunta en ella la fecha hasta la que la peña
+    gestiona la entrada de quien no resulta seleccionado por el club (cierre del club + PENA_DIAS_DESPUES días) y sale el bloque «Se non che toca polo club,
+    ponte en contacto connosco». v94: el día que remata la pre-reserva del club, el recordatorio lleva el bloque «ÚLTIMAS HORAS» con la hora de cierre."""
     for fichero in sorted(f for f in list(datos) if re.fullmatch(r"entradas_.+\.json", f)):
         en = datos[fichero]
         if not en or not en.get("nombre") or not en.get("visitantes"):
             continue
-        campos = ("competicion", "logo", "tag", "local", "visitante", "local_nombre", "visitante_nombre", "jornada", "partido_fecha_hora",
-                  "publicada", "verificada", "plazo_fin", "url", "nombre")
-        r = {"tipo": "aviso_pena", **{k: en[k] for k in campos if en.get(k) is not None}}
-        clave = "avisopena_" + fichero[len("entradas_"):]
-        with open(os.path.join(d_datos, clave), "w", encoding="utf-8") as fh:
-            json.dump(r, fh, ensure_ascii=False, indent=1)
-        datos[clave] = r
+        fp = cierre_pena(en)
+        if fp is not None and fp >= hoy:
+            en["plazo_pena"] = fp.isoformat()
+            with open(os.path.join(d_datos, fichero), "w", encoding="utf-8") as fh:
+                json.dump(en, fh, ensure_ascii=False, indent=1)
+        if en.get("plazo_fin"):
+            try:
+                if datetime.datetime.fromisoformat(en["plazo_fin"]).date() == hoy:
+                    cu = "ultimas_" + fichero[len("entradas_"):]
+                    u = {**en, "ultimas": True}
+                    with open(os.path.join(d_datos, cu), "w", encoding="utf-8") as fh:
+                        json.dump(u, fh, ensure_ascii=False, indent=1)
+                    datos[cu] = u
+            except ValueError:
+                pass
 
 
 def crear_pronostico(datos, hoy, d_datos):
@@ -331,6 +356,7 @@ def plan(hoy, datos, avisos):
 
     def add(clave, fichero, momento, hora, texto):
         out.append({"clave": clave, "fichero": fichero, "momento": momento, "hora": hora, "texto": texto})
+        return out[-1]
 
     previa = datos.get("previa_hoy.json")
     if previa:
@@ -509,21 +535,18 @@ def plan(hoy, datos, avisos):
         partido = en.get("partido") or "o próximo partido"
         primero = (" " + en["puntos"][0] + ".") if en.get("puntos") else ""
         que = "Entradas para afeccionados visitantes" if en.get("visitantes") else "Entradas dispoñibles"
+        fp = cierre_pena(en) if en.get("visitantes") else None
+        extra_pena = f" Se non che toca polo club, ponte en contacto connosco ata o {dia_gl(fp)}: WhatsApp {HIST_TEL}." if (fp and fp >= hoy) else ""
         add(f"entradas-{en['nombre']}", fichero, "mañana", "canto antes (para avisar aos peñistas)",
-            f"🎟️ {que}: {partido}.{primero} Todos os detalles: {en.get('url', 'rccelta.es')} {etiquetas('celta')}")
-        fa = "avisopena_" + fichero[len("entradas_"):]
-        if en.get("visitantes") and fa in datos:                                # v91: segunda historia, para los peñistas (gestión de la entrada) y para quien aún no es socio
-            import generar_historia as HIST
-            tel, mail, web = HIST.CONTACTO_PENA["whatsapp"], HIST.CONTACTO_PENA["email"], HIST.CONTACTO_PENA["web"]
-            add(f"entradas-pena-{en['nombre']}", fa, "mañana", "canto antes (para avisar aos peñistas)",
-                f"📣 Peñistas! Se queredes que vos xestionemos a entrada de visitante para {partido}, escribídenos: WhatsApp {tel} ou {mail}. "
-                f"E se aínda non sodes socios, uníos á peña en {web}! 💙 {etiquetas('celta')}")
-        if en.get("visitantes") and en.get("plazo_fin"):                       # v88: recordatorio el día que remata o prazo da pre-reserva (sen «hoxe», polo control de actualidade)
+            f"🎟️ {que}: {partido}.{primero}{extra_pena} Todos os detalles: {en.get('url', 'rccelta.es')} {etiquetas('celta')}")
+        if en.get("visitantes") and en.get("plazo_fin"):  # v88: recordatorio el día que remata o prazo da pre-reserva (sen «hoxe», polo control de actualidade)
             fin = datetime.datetime.fromisoformat(en["plazo_fin"])
             ahora_m = datetime.datetime.now(MADRID)
             if fin.date() == hoy and (hoy != ahora_m.date() or ahora_m.replace(tzinfo=None) < fin):
-                add(f"entradas-ultimas-{en['nombre']}", fichero, "mañana", "10:00",
-                    f"⏰ Remata a pre-reserva de entradas para {partido}: ata o {fin.strftime('%d/%m')} ás {fin.strftime('%H:%M')} h no Portal do Celtista. {en.get('url', 'rccelta.es')} {etiquetas('celta')}")
+                fu = "ultimas_" + fichero[len("entradas_"):]
+                u = add(f"entradas-ultimas-{en['nombre']}", fu if fu in datos else fichero, "mañana", "10:00",
+                        f"⏰ Non o deixes para o final! A pre-reserva de entradas para {partido} remata ás {fin.strftime('%H:%M')} h do {fin.strftime('%d/%m')} no Portal do Celtista.{extra_pena} {en.get('url', 'rccelta.es')} {etiquetas('celta')}")
+                u["cierre"] = en["plazo_fin"]
 
     # Cumpleaños: una historia por cada jugador o miembro del cuerpo técnico que cumple años hoy (datos en cumpleanos.json).
     for fichero in sorted(f for f in datos if re.fullmatch(r"cumpleanos_.+\.json", f)):
@@ -586,6 +609,8 @@ def ventana_instagram(h, t=None):
         hasta = desde + datetime.timedelta(minutes=90)             # v85: la alineación solo vale justo antes del partido
     elif c.startswith("entradas-ultimas-"):
         hasta = desde + datetime.timedelta(hours=2)                # v88: el recordatorio del último día solo vale a primera hora
+        if h.get("cierre"):                                        # v94: y nunca después de la hora de cierre de la pre-reserva
+            hasta = min(hasta, datetime.datetime.fromisoformat(h["cierre"]).replace(tzinfo=MADRID))
     elif c.startswith(("resultado-", "cronica-")):
         hasta = desde + datetime.timedelta(hours=8)
     elif c.startswith("convocatoria-"):
@@ -761,7 +786,7 @@ def main():
         for h in historias:
             estado[h["clave"]] = hoy.isoformat()
         os.makedirs(os.path.dirname(ESTADO), exist_ok=True)
-        json.dump(dict(sorted(estado.items())[-400:]), open(ESTADO, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        json.dump(dict(sorted(estado.items(), key=lambda kv: (kv[1], kv[0]))[-800:]), open(ESTADO, "w", encoding="utf-8"), ensure_ascii=False, indent=1)      # v93: se conservan las 800 claves MÁS NUEVAS (antes: las 400 últimas por orden alfabético, que perdía claves recientes y las historias podían repetirse)
 
     print(resumen)
     if not any(ok):

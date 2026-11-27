@@ -24,6 +24,7 @@ import shutil
 import unicodedata
 import subprocess
 import sys
+import urllib.parse
 import urllib.request
 import uuid
 from zoneinfo import ZoneInfo
@@ -562,7 +563,39 @@ def plan(hoy, datos, avisos):
 
 
 # ---------------------------------------------------------------- Telegram (opcional)
-def telegram(historias, resumen, avisos, rapido=False):
+# v100: chat de Telegram APARTE para X (TELEGRAM_CHAT_ID_X, opcional). Llega todo menos el directo (goles, tarjetas, penaltis parados) y los
+# pronósticos (enquisas). Cada aviso lleva la imagen, el texto ya pensado para X y un botón «Publicar en X» que abre X con el texto escrito
+# (la imagen se adjunta a mano: X no deja adjuntarla por enlace). No usa la API de X (de pago): no cuesta nada.
+SIN_X = ("gol-", "tarjeta-", "penalti-parado-", "pronostico-")
+LIMITE_X = 280
+
+
+def grupo_final(clave):
+    """v99/v100: el marcador y la crónica del mismo equipo son UN solo final (grupo `final-<equipo>`), o None si no es un final."""
+    m = re.match(r"(?:resultado|cronica)-(celta|fortuna|as-celtas-fem|baloncesto-fem)-", clave)
+    return f"final-{m.group(1)}" if m else None
+
+
+def _largo_x(t):
+    return sum(2 if ord(c) > 0xFFFF or 0x2190 <= ord(c) <= 0x2BFF else 1 for c in t)          # los emojis cuentan doble en X
+
+
+def texto_x(texto):
+    """El texto de la historia, listo para X: sin las menciones de Instagram (@jugador: en X sería otra cuenta; se deja @rccelta, que es
+    la misma) y recortado a 280 caracteres sin perder los hashtags del final."""
+    t = re.sub(r"(?<![\w@])@(?!rccelta\b)[\w.]+", "", texto, flags=re.I)
+    t = re.sub(r"[ \t]{2,}", " ", t).strip()
+    if _largo_x(t) <= LIMITE_X:
+        return t
+    i = t.find("#")
+    cuerpo, cola = (t[:i].rstrip(), " " + t[i:]) if i > 0 else (t, "")
+    while cuerpo and _largo_x(cuerpo + "…" + cola) > LIMITE_X:
+        corte = cuerpo.rfind(" ")
+        cuerpo = cuerpo[:corte].rstrip() if corte > 0 else cuerpo[:-1]
+    return (cuerpo + "…" + cola).strip()
+
+
+def telegram(historias, resumen, avisos, rapido=False, historias_x=None, enviadas_x=None):
     token, chat = os.environ.get("TELEGRAM_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
     if not token or not chat:
         return False
@@ -586,10 +619,35 @@ def telegram(historias, resumen, avisos, rapido=False):
         for h in historias:
             cab = "⚡ " if rapido else f"{h['hora']} · "
             llamar("sendPhoto", {"chat_id": chat, "caption": f"{cab}{h['texto']}"[:1000]}, h["imagen"])
-        return True
     except Exception as e:
         avisos.append(f"Telegram: {e}")
         return False
+    # v100: chat de X. Va DESPUÉS de que el chat de siempre haya salido bien, y un fallo aquí nunca hace que el chat de siempre se repita.
+    chat_x = os.environ.get("TELEGRAM_CHAT_ID_X")
+    if chat_x:
+        fallos = []
+        try:
+            if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch" and not rapido:        # al lanzarlo a mano, confirma que el chat de X está conectado
+                llamar("sendMessage", {"chat_id": chat_x, "text": "✅ Chat de X conectado. Aquí llegan las historias con el texto listo para X "
+                                                                  "(sin goles en directo ni pronósticos). Pulsa «Publicar en X», adjunta la imagen y publica."})
+        except Exception as e:
+            fallos.append(str(e)[:150])
+        for h in (historias_x or []):
+            try:
+                t = texto_x(h["texto"])
+                boton = json.dumps({"inline_keyboard": [[{"text": "🐦 Publicar en X", "url": "https://x.com/intent/post?text=" + urllib.parse.quote(t, safe="")}]]})
+                llamar("sendPhoto", {"chat_id": chat_x, "caption": t[:1000], "reply_markup": boton}, h["imagen"])
+                if enviadas_x is not None:
+                    enviadas_x.append(h)
+            except Exception as e:
+                fallos.append(f"{h['clave']}: {str(e)[:150]}")
+        if fallos:
+            avisos.append("Telegram (chat de X): " + "; ".join(fallos))
+            try:
+                llamar("sendMessage", {"chat_id": chat, "text": "⚠️ No se pudo enviar al chat de X: " + "; ".join(fallos)[:600]})
+            except Exception:
+                pass
+    return True
 
 
 # ---------------------------------------------------------------- principal
@@ -742,8 +800,7 @@ def main():
                 if h["clave"].startswith("pronostico-"):                  # v85: el pronóstico lleva la pegatina de la encuesta, que pones tú a mano: solo va a Telegram
                     continue
                 try:
-                    m_fin = re.match(r"(?:resultado|cronica)-(celta|fortuna|as-celtas-fem|baloncesto-fem)-", h["clave"])
-                    grupo = f"final-{m_fin.group(1)}" if m_fin else None          # v99: el marcador y la crónica del mismo equipo son UN solo final: a Instagram solo sale el primero (a Telegram siguen llegando los dos)
+                    grupo = grupo_final(h["clave"])          # v99: el marcador y la crónica del mismo equipo son UN solo final: a Instagram solo sale el primero (a Telegram siguen llegando los dos)
                     instagram.encolar(h["clave"], h["imagen"], h["texto"], *ventana_instagram(h), grupo=grupo)        # v86: sin etiquetas a jugadores
                 except Exception as e:
                     avisos.append(f"Instagram (preparar {h['clave']}): {e}")
@@ -778,8 +835,19 @@ def main():
     enviado = False
     configurado = bool(os.environ.get("TELEGRAM_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID"))
     quiere_envio = bool(historias) if rapido else bool(historias or avisos or resumen_dia)     # modo rápido: solo avisa si hay historias (los avisos van en las ejecuciones completas)
+    historias_x, enviadas_x, vistos_x = [], [], set()
+    if os.environ.get("TELEGRAM_CHAT_ID_X"):                       # v100: lo que va al chat de X (todo menos goles/tarjetas/penaltis y pronósticos; un solo final por equipo y día)
+        for h in historias:
+            if h["clave"].startswith(SIN_X):
+                continue
+            g = grupo_final(h["clave"])
+            if g:
+                if g in vistos_x or (not a.forzar and estado.get(f"x-{g}") == hoy.isoformat()):
+                    continue
+                vistos_x.add(g)
+            historias_x.append(h)
     if not a.sin_telegram and not a.offline and quiere_envio:
-        enviado = telegram(historias, resumen_tg, avisos, rapido)
+        enviado = telegram(historias, resumen_tg, avisos, rapido, historias_x, enviadas_x)
     # Si Telegram está configurado y el envío falla, no se anota nada: las historias y el resumen se reintentan en la siguiente ejecución.
     fallo_envio = configurado and quiere_envio and not enviado and not a.sin_telegram and not a.offline
     if not a.sin_estado and not a.offline and not fallo_envio:
@@ -787,6 +855,9 @@ def main():
             estado[clave_resumen] = hoy.isoformat()
         for h in historias:
             estado[h["clave"]] = hoy.isoformat()
+        for h in enviadas_x:                                       # v100: un solo final por equipo y día también en el chat de X
+            if grupo_final(h["clave"]):
+                estado[f"x-{grupo_final(h['clave'])}"] = hoy.isoformat()
         os.makedirs(os.path.dirname(ESTADO), exist_ok=True)
         json.dump(dict(sorted(estado.items(), key=lambda kv: (kv[1], kv[0]))[-800:]), open(ESTADO, "w", encoding="utf-8"), ensure_ascii=False, indent=1)      # v93: se conservan las 800 claves MÁS NUEVAS (antes: las 400 últimas por orden alfabético, que perdía claves recientes y las historias podían repetirse)
 

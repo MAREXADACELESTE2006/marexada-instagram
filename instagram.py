@@ -136,11 +136,20 @@ def guardar_cola(cola):
     json.dump(cola, open(COLA, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
 
-def encolar(clave, ruta_imagen, texto, desde, hasta, etiquetas=None):
-    """Sube la imagen y la apunta en la cola. desde/hasta: datetime con zona horaria. No hace nada si ya estaba en la cola."""
+def encolar(clave, ruta_imagen, texto, desde, hasta, etiquetas=None, grupo=None):
+    """Sube la imagen y la apunta en la cola. desde/hasta: datetime con zona horaria. No hace nada si ya estaba en la cola.
+    v99: grupo = «una sola historia por grupo» (p. ej. el final de un partido: el marcador y la crónica con goleadores llevan claves distintas
+    y salían las dos). Si ya hay en la cola otra del mismo grupo (pendiente, publicada o simulada) de las últimas 30 h, esta no se encola."""
     cola = cargar_cola()
     if any(i["clave"] == clave for i in cola):
         return False
+    if grupo:
+        lim = ahora() - datetime.timedelta(hours=30)
+        previa = next((i for i in cola if i.get("grupo") == grupo and i["estado"] in ("pendiente", "publicada", "simulada")
+                       and datetime.datetime.fromisoformat(i["creada"]) > lim), None)
+        if previa:
+            print(f"Instagram: {clave} no se encola: ya hay una del grupo «{grupo}» ({previa['clave']}, {previa['estado']}).")
+            return False
     nombre = re.sub(r"[^a-z0-9]+", "-", clave.lower()).strip("-")[:60] + f"-{int(time.time())}.jpg"
     try:
         url, sha = subir_imagen(ruta_imagen, nombre)
@@ -148,7 +157,7 @@ def encolar(clave, ruta_imagen, texto, desde, hasta, etiquetas=None):
         time.sleep(5)
         url, sha = subir_imagen(ruta_imagen, nombre)
     cola.append({"clave": clave, "nombre": nombre, "sha": sha, "url": url, "texto": texto, "desde": desde.isoformat(), "hasta": hasta.isoformat(),
-                 "estado": "pendiente", "intentos": 0, "id": None, "creada": ahora().isoformat(), **({"etiquetas": list(etiquetas)} if etiquetas else {})})
+                 "estado": "pendiente", "intentos": 0, "id": None, "creada": ahora().isoformat(), **({"grupo": grupo} if grupo else {}), **({"etiquetas": list(etiquetas)} if etiquetas else {})})
     guardar_cola(cola)
     return True
 
@@ -174,12 +183,14 @@ def publicar_historia(url, etiquetas=None):
     campos = {"image_url": url, "media_type": "STORIES"}
     cid = None
     if etiquetas:
-        tags = [{"username": u.lstrip("@"), "x": 0.5, "y": 0.67} for u in etiquetas]        # y 0.67: justo sobre la línea «@cuenta» de la imagen
+        tags = [({"username": u["username"].lstrip("@"), "x": u.get("x", 0.5), "y": u.get("y", 0.67)} if isinstance(u, dict)
+                 else {"username": u.lstrip("@"), "x": 0.5, "y": 0.67}) for u in etiquetas]     # y 0.67: justo sobre la línea «@cuenta» de la imagen
         try:
             cid = _graph(f"{uid}/media", {**campos, "user_tags": json.dumps(tags)}, post=True)["id"]
         except Exception as e:
-            print(f"aviso: Instagram no aceptó las etiquetas {etiquetas}: {e}; se publica sin etiquetar.", file=sys.stderr)
-            avisar(f"⚠️ Instagram no aceptó la etiqueta {', '.join('@' + u.lstrip('@') for u in etiquetas)}: la historia sale sin etiquetar ({str(e)[:150]})")
+            nombres = [t["username"] for t in tags]
+            print(f"aviso: Instagram no aceptó las etiquetas {nombres}: {e}; se publica sin etiquetar.", file=sys.stderr)
+            avisar(f"⚠️ Instagram no aceptó la etiqueta {', '.join('@' + n for n in nombres)}: la historia sale sin etiquetar ({str(e)[:150]})")
     if cid is None:
         cid = _graph(f"{uid}/media", campos, post=True)["id"]
     for _ in range(30):

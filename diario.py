@@ -742,7 +742,9 @@ def main():
                 if h["clave"].startswith("pronostico-"):                  # v85: el pronóstico lleva la pegatina de la encuesta, que pones tú a mano: solo va a Telegram
                     continue
                 try:
-                    instagram.encolar(h["clave"], h["imagen"], h["texto"], *ventana_instagram(h))        # v86: sin etiquetas a jugadores
+                    m_fin = re.match(r"(?:resultado|cronica)-(celta|fortuna|as-celtas-fem|baloncesto-fem)-", h["clave"])
+                    grupo = f"final-{m_fin.group(1)}" if m_fin else None          # v99: el marcador y la crónica del mismo equipo son UN solo final: a Instagram solo sale el primero (a Telegram siguen llegando los dos)
+                    instagram.encolar(h["clave"], h["imagen"], h["texto"], *ventana_instagram(h), grupo=grupo)        # v86: sin etiquetas a jugadores
                 except Exception as e:
                     avisos.append(f"Instagram (preparar {h['clave']}): {e}")
 

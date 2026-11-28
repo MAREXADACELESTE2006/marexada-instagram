@@ -3,6 +3,11 @@
  "partidos": [
   {
    "equipo": "as_celtas_fem",
+   "fecha": "2026-11-22",
+   "hora": null
+  },
+  {
+   "equipo": "as_celtas_fem",
    "fecha": "2026-12-05",
    "hora": "16:45"
   },

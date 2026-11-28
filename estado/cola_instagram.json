@@ -1,47 +1,5 @@
 [
  {
-  "clave": "previa-Xov 26/11 · 18:45",
-  "nombre": "previa-xov-26-11-18-45-1795653486.jpg",
-  "sha": "b98de0ce36658cd95fbdc85b59ac53e651ded01c",
-  "url": "https://raw.githubusercontent.com/MAREXADACELESTE2006/marexada-instagram/imagenes/historias/previa-xov-26-11-18-45-1795653486.jpg",
-  "texto": "Hoxe hai previa na nosa sede, a Cafetería Kiev, ás 16:45 h! Veña tomar algo antes do Celta - AFC Bournemouth 🍻 #RCCelta #Celta #MarexadaCeleste",
-  "desde": "2026-11-26T01:38:06.490751+01:00",
-  "hasta": "2026-11-26T23:59:00+01:00",
-  "estado": "publicada",
-  "intentos": 0,
-  "id": "18091136285310568",
-  "creada": "2026-11-26T01:38:08.163472+01:00",
-  "publicada": "2026-11-26T01:38:28.121458+01:00"
- },
- {
-  "clave": "clasificacion-as-celtas-fem-Xornada 10",
-  "nombre": "clasificacion-as-celtas-fem-xornada-10-1795653488.jpg",
-  "sha": "a6fa6a8ac916b4711215345db0ba0df2e1beaaf0",
-  "url": "https://raw.githubusercontent.com/MAREXADACELESTE2006/marexada-instagram/imagenes/historias/clasificacion-as-celtas-fem-xornada-10-1795653488.jpg",
-  "texto": "Así está a clasificación de Segunda Federación Femenina (AS Celtas) tras a xornada 10. 💙 #ASCeltas #MarexadaCeleste",
-  "desde": "2026-11-26T19:00:00+01:00",
-  "hasta": "2026-11-26T23:59:00+01:00",
-  "estado": "publicada",
-  "intentos": 0,
-  "id": "18185749783437377",
-  "creada": "2026-11-26T01:38:09.794448+01:00",
-  "publicada": "2026-11-26T19:01:15.501141+01:00"
- },
- {
-  "clave": "partemedico-fortuna-bbb726da21-1",
-  "nombre": "partemedico-fortuna-bbb726da21-1-1795709975.jpg",
-  "sha": "ec1678ba3261c2a9572c3f2a34c972adba46358c",
-  "url": "https://raw.githubusercontent.com/MAREXADACELESTE2006/marexada-instagram/imagenes/historias/partemedico-fortuna-bbb726da21-1-1795709975.jpg",
-  "texto": "Parte médico do Celta Fortuna: 4 xogadores en baixa. Hugo Cuenca, Stefan Bajčetić, Pablo Gavián, Bernard Somuah. Moito ánimo e pronta recuperación! 💙 #RCCelta #Celta #MarexadaCeleste",
-  "desde": "2026-11-26T17:19:35.726350+01:00",
-  "hasta": "2026-11-26T23:59:00+01:00",
-  "estado": "publicada",
-  "intentos": 0,
-  "id": "18140520190678706",
-  "creada": "2026-11-26T17:19:37.345727+01:00",
-  "publicada": "2026-11-26T17:19:52.491315+01:00"
- },
- {
   "clave": "resultado-celta-Xov 26/11-1-2-g",
   "nombre": "resultado-celta-xov-26-11-1-2-g-1795722352.jpg",
   "sha": "9e8e12d64471372d1cec5953497423af20efe5a4",
@@ -96,5 +54,31 @@
   "id": "17961310305016964",
   "creada": "2026-11-27T17:05:01.692181+01:00",
   "publicada": "2026-11-27T17:05:13.612469+01:00"
+ },
+ {
+  "clave": "proximo-celta-Dom 29/11 · 18:30",
+  "nombre": "proximo-celta-dom-29-11-18-30-1795824755.jpg",
+  "sha": "9e6d3077ccc4d6501087b03b3e1e6184e33b8413",
+  "url": "https://raw.githubusercontent.com/MAREXADACELESTE2006/marexada-instagram/imagenes/historias/proximo-celta-dom-29-11-18-30-1795824755.jpg",
+  "texto": "Mañá xogamos! Celta - Villarreal, Dom 29/11 · 18:30. Forza! 💙 #RCCelta #Celta #MarexadaCeleste",
+  "desde": "2026-11-28T10:00:00+01:00",
+  "hasta": "2026-11-28T23:59:00+01:00",
+  "estado": "pendiente",
+  "intentos": 0,
+  "id": null,
+  "creada": "2026-11-28T01:12:37.341753+01:00"
+ },
+ {
+  "clave": "proximo-baloncesto-fem-hoxe-Sáb 28/11 · 16:45",
+  "nombre": "proximo-baloncesto-fem-hoxe-s-b-28-11-16-45-1795824757.jpg",
+  "sha": "54ea2e67eb703490db514ed5d611fd24aa946833",
+  "url": "https://raw.githubusercontent.com/MAREXADACELESTE2006/marexada-instagram/imagenes/historias/proximo-baloncesto-fem-hoxe-s-b-28-11-16-45-1795824757.jpg",
+  "texto": "Hoxe xogamos! Innova-TSN Leganés - Celta Femxa Zorka, Sáb 28/11 · 16:45. Forza! 💙 #CeltaBaloncesto #CeltaFemxaZorka #MarexadaCeleste",
+  "desde": "2026-11-28T10:00:00+01:00",
+  "hasta": "2026-11-28T23:59:00+01:00",
+  "estado": "pendiente",
+  "intentos": 0,
+  "id": null,
+  "creada": "2026-11-28T01:12:39.231258+01:00"
  }
 ]

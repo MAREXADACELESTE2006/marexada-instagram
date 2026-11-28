@@ -35,10 +35,11 @@
   "texto": "Mañá xogamos! Celta - Villarreal, Dom 29/11 · 18:30. Forza! 💙 #RCCelta #Celta #MarexadaCeleste",
   "desde": "2026-11-28T10:00:00+01:00",
   "hasta": "2026-11-28T23:59:00+01:00",
-  "estado": "pendiente",
+  "estado": "publicada",
   "intentos": 0,
-  "id": null,
-  "creada": "2026-11-28T01:12:37.341753+01:00"
+  "id": "18144377629626001",
+  "creada": "2026-11-28T01:12:37.341753+01:00",
+  "publicada": "2026-11-28T10:01:22.065000+01:00"
  },
  {
   "clave": "proximo-baloncesto-fem-hoxe-Sáb 28/11 · 16:45",
@@ -48,9 +49,10 @@
   "texto": "Hoxe xogamos! Innova-TSN Leganés - Celta Femxa Zorka, Sáb 28/11 · 16:45. Forza! 💙 #CeltaBaloncesto #CeltaFemxaZorka #MarexadaCeleste",
   "desde": "2026-11-28T10:00:00+01:00",
   "hasta": "2026-11-28T23:59:00+01:00",
-  "estado": "pendiente",
+  "estado": "publicada",
   "intentos": 0,
-  "id": null,
-  "creada": "2026-11-28T01:12:39.231258+01:00"
+  "id": "17921159031541403",
+  "creada": "2026-11-28T01:12:39.231258+01:00",
+  "publicada": "2026-11-28T10:01:35.151617+01:00"
  }
 ]
